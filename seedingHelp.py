@@ -36,6 +36,12 @@ def getGenders():
 def getStrokes():
     return strokes
 
+def getAgeGenderTeam(df, ageRange, gender, team):
+    df = df[df['Age'].isin(ageRange)]
+    df = df[df['Gender'] == gender]
+    df = df[df['Team'] == team]
+    return df
+
 class Swimmer:
 
     def __init__(self, name, team, age, gender, times):
