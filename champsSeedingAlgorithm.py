@@ -43,9 +43,6 @@ def seedSpecificTeam(teamData, team, age, gender):
             ageGroup.enterSwimmer(tempData['Swimmer'].values[strokeDepth[badIndex]], badStroke)
     return ageGroup.convertToDf()
 
-
-
-
 def seedOtherTeams(allData, ageRange, gender):
     teams = help.getTeams()
     output = pd.DataFrame()
@@ -438,6 +435,8 @@ def transformOutputDict(outputDict):
     return outputString
 
 def placeToScore(place):
+    if place == -1:
+        return -1
     if place == 1:
         return 19
     else:
@@ -445,6 +444,15 @@ def placeToScore(place):
 
 def relayToScore(place):
     return placeToScore(place) + 10
+
+def dataframePlaceToScore(df):
+    for stroke in help.getStrokes():
+        df[stroke] = df[stroke].apply(placeToScore)
+    return df
+
+def getAllRelayTeams(testData):
+    swimmers = testData['Swimmer'].tolist()
+    
 
 def scoreAgeGroup(scoredData, allData, entriesDict, relays):
     totalScore = 0
@@ -472,16 +480,16 @@ def scoreAgeGroup(scoredData, allData, entriesDict, relays):
         findRelayScore(allData, age, gender, team, relays[1], False)
     return totalScore
 
-allData = pd.read_csv("C:/Users/ucg8nb/Downloads/2025 Data Transform.csv")
-optOutList = pd.read_csv("C:/Users/ucg8nb/Downloads/OptOutList.csv")
-optOutList['Name'] = ' ' + optOutList['Name']
-optOuts = optOutList['Name'].tolist()
-print(optOuts)
-outputDict, originalEntriesDict, justification, outputRelays, originalOutputRelays, twoAndTwoDf = seedEntireTeam(allData, 'CITY', doTwos = True, optOutList = optOuts)
-print(transformOutputDict(outputDict))
-# print(outputRelays)
-print(justification)
-twoAndTwoDf.to_csv("C:/Users/ucg8nb/Downloads/Two And Two.csv")
+# allData = pd.read_csv("C:/Users/ucg8nb/Downloads/2025 Data Transform.csv")
+# optOutList = pd.read_csv("C:/Users/ucg8nb/Downloads/OptOutList.csv")
+# optOutList['Name'] = ' ' + optOutList['Name']
+# optOuts = optOutList['Name'].tolist()
+# print(optOuts)
+# outputDict, originalEntriesDict, justification, outputRelays, originalOutputRelays, twoAndTwoDf = seedEntireTeam(allData, 'CITY', doTwos = True, optOutList = optOuts)
+# print(transformOutputDict(outputDict))
+# # print(outputRelays)
+# print(justification)
+# twoAndTwoDf.to_csv("C:/Users/ucg8nb/Downloads/Two And Two.csv")
 
 
 

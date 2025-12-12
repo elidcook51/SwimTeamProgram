@@ -353,6 +353,9 @@ def getChampsResults(champsFolder):
         readType = 1
         for page in reader.pages:
             text = page.extract_text()
+
+
+
 # getChampsResults("C:/Users/ucg8nb/Downloads/Champs Results")
 
 # fullData = getFullData('All Results')

@@ -43,16 +43,16 @@ def checkScratches(meetEntriesPath, meetResultsPath):
             outputList.append(e)
     return sorted(list(set(outputList)))
 
-createCleanedOptOuts(fullForm).to_csv("C:/Users/ucg8nb/Downloads/Cleaned Opt Outs.csv")
-optOuts = pd.read_csv("C:/Users/ucg8nb/Downloads/Cleaned Opt Outs.csv")
-meetEntries = "C:/Users/ucg8nb/Downloads/check entries july 2.csv"
-meetResults= "C:/Users/ucg8nb/Downloads/check scratches july 2.csv"
-scratches = checkScratches(meetEntries, meetResults)
-# july2 = optOuts[optOuts["July 2 Opt Out"] == 1]
-# july2 = july2[['Name', 'Age', 'July 2 Opt Out', 'July 2 Time']]
-# july2.to_csv("C:/Users/ucg8nb/Downloads/July 2 opt outs.csv")
-july9 = optOuts[optOuts["July 9 Opt Out"] == 1]
-july9[['firstName', 'lastName']] = july9['Name'].str.split(n = 1, expand = True)
-july9 = july9.sort_values(by = ['lastName', 'firstName'])
-july9 = july9[['Name', 'Age', 'July 9 Opt Out', 'July 9 Time']]
-july9.to_csv("C:/Users/ucg8nb/Downloads/July 9 opt outs.csv")
+# createCleanedOptOuts(fullForm).to_csv("C:/Users/ucg8nb/Downloads/Cleaned Opt Outs.csv")
+# optOuts = pd.read_csv("C:/Users/ucg8nb/Downloads/Cleaned Opt Outs.csv")
+# meetEntries = "C:/Users/ucg8nb/Downloads/check entries july 2.csv"
+# meetResults= "C:/Users/ucg8nb/Downloads/check scratches july 2.csv"
+# scratches = checkScratches(meetEntries, meetResults)
+# # july2 = optOuts[optOuts["July 2 Opt Out"] == 1]
+# # july2 = july2[['Name', 'Age', 'July 2 Opt Out', 'July 2 Time']]
+# # july2.to_csv("C:/Users/ucg8nb/Downloads/July 2 opt outs.csv")
+# july9 = optOuts[optOuts["July 9 Opt Out"] == 1]
+# july9[['firstName', 'lastName']] = july9['Name'].str.split(n = 1, expand = True)
+# july9 = july9.sort_values(by = ['lastName', 'firstName'])
+# july9 = july9[['Name', 'Age', 'July 9 Opt Out', 'July 9 Time']]
+# july9.to_csv("C:/Users/ucg8nb/Downloads/July 9 opt outs.csv")

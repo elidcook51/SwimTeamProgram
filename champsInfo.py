@@ -4,8 +4,6 @@ import matplotlib.pyplot as plt
 import os
 from itertools import combinations
 from itertools import permutations
-import win32print
-import win32api
 import PyPDF2
 
 teams = ['ACAC', 'BHSC', 'CITY', 'CGST', 'CBST', 'ELKS', 'FV', 'FCC','FAST', 'FSBC', 'GLEN', 'GHG', 'HM', 'KWC', 'FLST', 'LMST', 'LG']
@@ -243,31 +241,9 @@ def makeRelayPdf(team, database):
     dfToPdf(relayPos, 'Relay Positions.pdf', relayPath)
     return relayPos
 
-def printPdfs(folderName):
-    printerName= win32print.GetDefaultPrinter()
-    for file in os.listdir(folderName):
-        printPdf(os.path.join(folderName, file))
 
 
-def printPdf(file):
-    printerName = win32print.GetDefaultPrinter()
-    outputPath = 'scaledPDFToPrint'
-    scale_factor = 0.6
-    with open(file, 'rb') as pdf_file:
-        pdf_reader = PyPDF2.PdfReader(pdf_file)
-        pdf_writer = PyPDF2.PdfWriter()
 
-        for page in pdf_reader.pages:
-            page.scale_by(scale_factor)
-            pdf_writer.add_page(page)
-
-        with open(outputPath, 'wb') as output_file:
-            pdf_writer.write(output_file)
-    try:
-        win32api.ShellExecute(0, 'print', file, f'/d:"{printerName}"', '.', 0)
-    except Exception as e:
-        print(f"Error: {e}")
-    os.remove(outputPath)
 
 def makePDFToPrint(folderNames):
     if os.path.exists('printerPDF.pdf'):
@@ -283,9 +259,9 @@ def makePDFToPrint(folderNames):
 
 #db.getFullResults()
 #db.updateDatabase()
-database = pd.read_csv("C:/Users/ucg8nb/Downloads/2025 Data Transform.csv")
+# database = pd.read_csv("C:/Users/ucg8nb/Downloads/2025 Data Transform.csv")
 #createFolders('CITY', database)
-makeRelayPdf('CITY',database)
+# makeRelayPdf('CITY',database)
 # os.remove('printerPDF')
 # makePDFToPrint(['Raw Position Folder', 'Score Position Folder', 'Relay Position Folder'])
 #printPdfs('Raw Position Folder')
