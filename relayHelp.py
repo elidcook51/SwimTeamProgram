@@ -82,7 +82,17 @@ def allRelayScores(allData, ageRange, gender, free):
     allRelayTimes = allRelayTimes.sort_values(by = 'Time', ascending = True)
     return allRelayTimes
 
-def buildRelayPositions(allData, ageRange, gender, team):
+def getUnecessarySwimmers(fastRunData):
+    possibleSwimmers = fastRunData['Swimmer'].tolist()
+    for stroke in ['sf', 'ba', 'br', 'fl']:
+        tempDf = fastRunData.sort_values(by = stroke, ascending = True).head(4)
+        for s in tempDf['Swimmer'].tolist():
+            if s in possibleSwimmers:
+                possibleSwimmers.remove(s)
+    return possibleSwimmers
+
+
+def buildRelayPositions(allData, ageRange, gender, team, threeEventSwimmers):
     freeRelayScores = allRelayScores(allData, ageRange, gender, True)
     medleyRelayScores = allRelayScores(allData, ageRange, gender, False)
     freeRelayScores = freeRelayScores[freeRelayScores['Team'] != team]
@@ -91,6 +101,11 @@ def buildRelayPositions(allData, ageRange, gender, team):
     medleyRelayTimes = medleyRelayScores['Time'].to_numpy()
 
     smallData = help.getAgeGenderTeam(allData, ageRange, gender, team)
+
+    efficiencyHelper = smallData[~smallData['Swimmer'].isin(threeEventSwimmers)]
+    remSwimmers = getUnecessarySwimmers(efficiencyHelper)
+    smallData = smallData[~smallData['Swimmer'].isin(remSwimmers)]
+
 
     swimmers = smallData['Swimmer'].tolist()
     fl = smallData['fl'].tolist()

@@ -8,7 +8,6 @@ import relayHelp as relays
 
 def noRelayProgram(testData):
     events = help.getStrokes()
-
     records = []
     for _, row in testData.iterrows():
          s = row['Swimmer']
@@ -45,6 +44,19 @@ def noRelayProgram(testData):
 
     x_vals = ampl.getVariable('x').getValues().toPandas()
     return x_vals
+
+def getThreeEventSwimmers(testData):
+    x_vals = noRelayProgram(testData)
+    x_vals = x_vals[x_vals['x.val'] > 0.5]
+    x_vals = x_vals.reset_index()
+    x_vals = x_vals.rename(columns={"index0": "Swimmer", "index1": "Event", "value": "Chosen"})
+    swimmers = x_vals['Swimmer'].unique().tolist()
+    threeSwim = []
+    for s in swimmers:
+        tempDf = x_vals[x_vals['Swimmer'] == s]
+        if len(tempDf) == 3:
+            threeSwim.append(s)
+    return threeSwim
 
 def relayProgram(testData, relayData, incData):
     setupCode = r"""
@@ -109,14 +121,13 @@ def relayProgram(testData, relayData, incData):
 
 
 allData = pd.read_csv("C:/Users/ucg8nb/Downloads/2025 Data Transform.csv")
-
-relayPos = relays.buildRelayPositions(allData, [13,14], 'W', 'CITY')
 testData = individualSeed.scoreOneTeam(allData, [13,14], 'W', 'CITY')
 testData = individualSeed.dataframePlaceToScore(testData)
+relayPos = relays.buildRelayPositions(allData, [13,14], 'W', 'CITY', getThreeEventSwimmers(testData))
 swimmers = testData['Swimmer'].tolist()
 incData = relays.buildInc(relayPos, swimmers)
-
-noRelayProgram(testData)
+# print(len(incData))
+x_vals = noRelayProgram(testData)
 relayProgram(testData, relayPos, incData)
 
 
