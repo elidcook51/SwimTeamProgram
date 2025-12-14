@@ -64,6 +64,7 @@ def seedChamps(allData, team):
     ageRanges = help.getAgeGroups()
     genders = help.getGenders()
     outputString = ''
+    totPoints = 0
     for a in ageRanges:
         for g in genders:
             tempDf = ind.scoreOneTeam(allData, a, g, team)
@@ -72,7 +73,8 @@ def seedChamps(allData, team):
             swimmers = tempDf['Swimmer'].tolist()
             incData = relay.buildInc(relayPos, swimmers)
             x_vals, y_vals, points = algorithms.relayProgram(tempDf, relayPos, incData)
+            totPoints += points
             outputString += resultsToString(x_vals,y_vals, incData, allData)
-    return outputString
+    return outputString + f'\n Total Points Scored: {totPoints}'
 
 print(seedChamps(allData, 'CITY'))
