@@ -17,11 +17,11 @@ def relayToScore(place):
 
 def calcMedleyTime(swimmers, times):
     totalTime = 0
-    strokes = ['fl', 'ba', 'br', 'fr']
+    strokes = ['ba', 'br', 'fl', 'fr']
     for index, swimmer in enumerate(swimmers):
         strokeTime = times[swimmer][strokes[index]]
         if strokeTime == -1:
-            return float('-inf')
+            return float('inf')
         totalTime += strokeTime
     return totalTime
 
@@ -52,6 +52,29 @@ def makeMedleyRelay(smallData):
     if bestComb == None:
         return None, bestTime
     return list(bestComb), bestTime
+
+def makeBestMedleyRelay(swimmers, allData):
+    swimTimes = allData[allData['Swimmer'].isin(swimmers)]
+    fl = swimTimes['fl'].tolist()
+    ba = swimTimes['ba'].tolist()
+    br = swimTimes['br'].tolist()
+    fr = swimTimes['sf'].tolist()
+    times = {swimmers[0]: {'fl':fl[0], 'ba':ba[0], 'br':br[0], 'fr':fr[0]}}
+    for i in range(1, len(swimmers)):
+        times[swimmers[i]] = {
+            'fl':fl[i],
+            'ba':ba[i],
+            'br':br[i],
+            'fr':fr[i]
+        }
+    bestComb = None
+    bestTime = float('inf')
+    for perm in permutations(swimmers):
+        curTime = calcMedleyTime(perm, times)
+        if curTime < bestTime:
+                bestTime = curTime
+                bestComb = perm
+    return bestComb
 
 def makeFreeRelay(smallDf):
     smallDf = smallDf[smallDf['sf'] != -1]

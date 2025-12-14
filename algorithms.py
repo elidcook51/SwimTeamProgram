@@ -120,15 +120,15 @@ def relayProgram(testData, relayData, incData):
 
 
 
-allData = pd.read_csv("C:/Users/ucg8nb/Downloads/2025 Data Transform.csv")
-testData = individualSeed.scoreOneTeam(allData, [13,14], 'W', 'CITY')
-testData = individualSeed.dataframePlaceToScore(testData)
-relayPos = relays.buildRelayPositions(allData, [13,14], 'W', 'CITY', getThreeEventSwimmers(testData))
-swimmers = testData['Swimmer'].tolist()
-incData = relays.buildInc(relayPos, swimmers)
-# print(len(incData))
-x_vals = noRelayProgram(testData)
-relayProgram(testData, relayPos, incData)
+# allData = pd.read_csv("C:/Users/ucg8nb/Downloads/2025 Data Transform.csv")
+# testData = individualSeed.scoreOneTeam(allData, [13,14], 'W', 'CITY')
+# testData = individualSeed.dataframePlaceToScore(testData)
+# relayPos = relays.buildRelayPositions(allData, [13,14], 'W', 'CITY', getThreeEventSwimmers(testData))
+# swimmers = testData['Swimmer'].tolist()
+# incData = relays.buildInc(relayPos, swimmers)
+# # print(len(incData))
+# x_vals = noRelayProgram(testData)
+# relayProgram(testData, relayPos, incData)
 
 
 
