@@ -119,7 +119,6 @@ def relayProgram(testData, relayData, incData):
     return x_vals, y_vals, obj_val
 
 
-
 # allData = pd.read_csv("C:/Users/ucg8nb/Downloads/2025 Data Transform.csv")
 # testData = individualSeed.scoreOneTeam(allData, [13,14], 'W', 'CITY')
 # testData = individualSeed.dataframePlaceToScore(testData)

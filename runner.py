@@ -6,7 +6,7 @@ import databaseBuilder as db
 import pandas as pd
 import numpy as np
 
-allData = pd.read_csv("C:/Users/ucg8nb/Downloads/2025 Data Transform.csv")
+allData = pd.read_csv("C:/Users/ucg8nb/Downloads/Full Swim Data.csv")
 
 def createAllData(jslWebsiteLink, outputPath):
     db.getFullResults(jslWebsiteLink, 'Current Data')
@@ -68,7 +68,7 @@ def seedChamps(allData, team):
     for a in ageRanges:
         for g in genders:
             tempDf = ind.scoreOneTeam(allData, a, g, team)
-            tempDf = ind.dataframePlaceToScore(tempDf)
+            tempDf = ind.dataframePlaceToScoreChamps(tempDf)
             relayPos = relay.buildRelayPositions(allData, a, g, team, algorithms.getThreeEventSwimmers(tempDf))
             swimmers = tempDf['Swimmer'].tolist()
             incData = relay.buildInc(relayPos, swimmers)
@@ -77,4 +77,18 @@ def seedChamps(allData, team):
             outputString += resultsToString(x_vals,y_vals, incData, allData)
     return outputString + f'\n Total Points Scored: {totPoints}'
 
-print(seedChamps(allData, 'CITY'))
+def seedDuelMeet(allData, team1, team2):
+    ageRanges = help.getAgeGroups()
+    genders = help.getGenders()
+    outputString = ''
+    team1Points = 0
+    team2Points = 0
+    for a in ageRanges:
+        for g in genders:
+            tempDf = ind.ScoreOneteamDuel(allData, a, g, team1, team2)
+            tempDf = ind.dataframePlaceToScoreDuel(tempDf)
+            x_vals = algorithms.noRelayProgram(tempDf)
+            print(x_vals)
+
+
+print(seedDuelMeet(allData, 'CITY', 'LMST'))

@@ -271,6 +271,8 @@ def getEventType(eventNum):
 def fullDataTransform(fullData):
     dataBase = pd.DataFrame(columns = ['Swimmer', 'Gender', 'Age', 'Team', 'sf', 'ba', 'br', 'fl', 'lf', 'im'])
     for index, row in fullData.iterrows():
+        if row['Event'] in ['81', '82', '83', '84', '85', '86', '87', '88', '89', '90']:
+            continue
         name = row['Swimmer']
         if name not in dataBase['Swimmer'].values:
             dataBase = dataBase._append(addSwimmer(name, row['Event'], row['Team']), ignore_index = True)
@@ -354,23 +356,11 @@ def getChampsResults(champsFolder):
         for page in reader.pages:
             text = page.extract_text()
 
-
-
-# getChampsResults("C:/Users/ucg8nb/Downloads/Champs Results")
-
-# fullData = getFullData('All Results')
-# fullData.to_csv("C:/Users/ucg8nb/Downloads/Full Swim Data.csv")
-#getTopTimes('LMST')
-
-# print(getFullResults('https://www.jsl.org/meet-results2020.php?section=results', '2025 Data'))
-# #
-# curData = getFullData('2025 Data')
-# curData.to_csv("C:/Users/ucg8nb/Downloads/2025 Data.csv")
-# #
-# fullData = pd.read_csv("C:/Users/ucg8nb/Downloads/2025 Data.csv")
-# getTopTimes('FV', fullData)
-# trans2025 = fullDataTransform(fullData)
-# trans2025.to_csv("C:/Users/ucg8nb/Downloads/2025 Data Transform.csv")
-
+jslPath = "C:/Users/ucg8nb/JSL All Results 2021-2025"
+# fullData = getFullData(jslPath)
+# fullData.to_csv(f"{jslPath}/Untransformed Data.csv")
+fullData = pd.read_csv(f"{jslPath}/Untransformed Data.csv")
+transData = fullDataTransform(fullData)
+transData.to_csv(f"{jslPath}/Transformed Data.csv")
 
 

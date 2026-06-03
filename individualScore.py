@@ -106,6 +106,42 @@ def scoreOneTeam(allData, ageRange, gender, team):
         outputTeamData = outputTeamData._append(newRow, ignore_index = True)
     return outputTeamData
 
+def scoreOneTeamDuel(allData, ageRange, gender, team1, team2):
+    topTwo = seedOtherTeams(allData, ageRange, gender)
+    team2Top2 = topTwo[topTwo['Team'] == team2]
+    team1Data = allData[allData['Team'] == team1]
+    team1Data = team1Data[team1Data['Age'].isin(ageRange)]
+    team1Data = team1Data[team1Data['Gender'] == gender]
+    outputTeamData = pd.DataFrame()
+    for index, row in team1Data.iterrows():
+        swimmer = row['Swimmer']
+        gender = row['Gender']
+        age = row['Age']
+        team = row['Team']
+        strokes = []
+        for s in help.getStrokes():
+            tempTopTwo = team2Top2[team2Top2['Stroke'] == s]
+            times = sorted(tempTopTwo['Time'].tolist())
+            strokeTime = row[s]
+            if strokeTime == -1:
+                strokes.append(-1)
+            else:
+                strokes.append(findIndexInList(times, strokeTime))
+        newRow = {
+            'Swimmer': swimmer,
+            'Gender': gender,
+            'Age': age,
+            'Team': team,
+            'sf': strokes[0],
+            'ba': strokes[1],
+            'br': strokes[2],
+            'fl': strokes[3],
+            'lf': strokes[4],
+            'im': strokes[5]
+        }
+        outputTeamData = outputTeamData._append(newRow, ignore_index = True)
+    return outputTeamData
+
 def checkEntries(namesEntered, twoAndTwo = []):
     rawList = []
     for stroke in namesEntered:
@@ -259,10 +295,27 @@ def placeToScore(place):
         return 19
     else:
         return -0.5 * place + 19
+    
+def placeToScoreDuel(place):
+    if place == -1:
+        return -1
+    if place == 1:
+        return 7
+    if place == 2:
+        return 5
+    if place == 3:
+        return 4
+    else:
+        return 3
 
-def dataframePlaceToScore(df):
+def dataframePlaceToScoreChamps(df):
     for stroke in help.getStrokes():
         df[stroke] = df[stroke].apply(placeToScore)
+    return df
+
+def dataframePlaceToScoreDuel(df):
+    for stroke in help.getStrokes():
+            df[stroke] = df[stroke].apply(placeToScoreDuel)
     return df
 
 
