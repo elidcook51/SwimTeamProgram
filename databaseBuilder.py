@@ -112,6 +112,7 @@ def getSCMTime(time, team):
         return time * 1.11
     if long:
         return time * 0.971
+
 def getTime(line, team):
     time = 0
     perIndex = line.find(".")
@@ -271,23 +272,47 @@ def getEventType(eventNum):
     num = int((eventNum -1) / 10)
     return eventTypes[num]
 
+def check25Event(eventNum):
+    if "P" in str(eventNum):
+        return True
+    eventNum = int(eventNum)
+    if (eventNum - 1) % 10 < 2:
+        return True
+    return False
+
 def fullDataTransform(fullData):
     fullData['Date'] = pd.to_datetime(fullData['Date'], format = 'mixed', errors = 'coerce')
-    curYear = fullData['Date'].dt.year.max()
+    fullData = fullData.dropna(subset = ['Swimmer', 'Team'])
+    # curYear = fullData['Date'].dt.year.max()
+    curYear = 2026
     dataBase = pd.DataFrame(columns = ['Swimmer', 'Gender', 'Age', 'Team', 'sf', 'ba', 'br', 'fl', 'lf', 'im'])
     for index, row in fullData.iterrows():
+        if row['Time'] == -1:
+            continue
         if row['Event'] in ['81', '82', '83', '84', '85', '86', '87', '88', '89', '90']:
             continue
         name = row['Swimmer']
-        if name not in dataBase['Swimmer'].values:
+        if pd.isna(row['Swimmer']) or 'nan' in name or name.strip() == '' or 'Event' in name or 'AgeName' in name:
+            continue
+        if not ((dataBase['Swimmer'] == name) & (dataBase['Team'] == row['Team'])).any():
             dataBase = dataBase._append(addSwimmer(name, row['Event'], row['Team'], row['Date'], curYear), ignore_index = True)
         event = getEventType(row['Event'])
-        dataBase.set_index('Swimmer', inplace = True)
-        if dataBase.loc[name, event] == -1:
-            dataBase.loc[name, event] = row['Time']
-        elif dataBase.loc[name, event] >= row['Time']:
-            dataBase.loc[name,event] = row['Time']
-        dataBase.reset_index(drop = False, inplace = True)
+        if check25Event(row['Event']) and dataBase.loc[(dataBase['Swimmer'] == name) & (dataBase['Team'] == row['Team']), 'Age'].iloc[0] > 8:
+            if "P" not in row['Event']:
+                if int(int(row['Event']) / 10) == 6:
+                    event = 'sf'
+                else:
+                    continue
+            else:
+                continue
+        if name == ' Samuel Johnson' and row['Team'] == 'CITY':
+            print(row)
+        if name == ' Samuel Johnson':
+            print(row)
+        if dataBase.loc[(dataBase['Swimmer'] == name) & (dataBase['Team'] == row['Team']), event].iloc[0] == -1:
+            dataBase.loc[(dataBase['Swimmer'] == name) & (dataBase['Team'] == row['Team']), event] = row['Time']
+        elif dataBase.loc[(dataBase['Swimmer'] == name) & (dataBase['Team'] == row['Team']), event].iloc[0] >= row['Time']:
+            dataBase.loc[(dataBase['Swimmer'] == name) & (dataBase['Team'] == row['Team']),event] = row['Time']
     print('dataBase transformed')
     return dataBase
 

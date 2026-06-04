@@ -142,6 +142,25 @@ def scoreOneTeamDuel(allData, ageRange, gender, team1, team2):
         outputTeamData = outputTeamData._append(newRow, ignore_index = True)
     return outputTeamData
 
+def getOneTeamTopStrokeX(allData, ageRange, gender, team, stroke, X):
+    tempDf = allData[allData['Team'] == team]
+    tempDf = tempDf[tempDf['Age'].isin(ageRange)]
+    tempDf = tempDf[tempDf['Gender'] == gender]
+    tempDf = tempDf[tempDf[stroke] != -1]
+    curList = tempDf[stroke].tolist()
+    if len(curList) < X:
+        curList = sorted(curList)
+        curList = curList + [""] * (X - len(curList))
+        return curList
+    return sorted(curList)[:X]
+
+def oppTimes(allData, ageRange, gender, team):
+    outputDict = {}
+    for e in ['sf', 'ba', 'br', 'fl', 'lf', 'im']:
+        topTimesList = getOneTeamTopStrokeX(allData, ageRange, gender, team, e, 5)
+        outputDict[e] = topTimesList
+    return pd.DataFrame(outputDict)
+
 def checkEntries(namesEntered, twoAndTwo = []):
     rawList = []
     for stroke in namesEntered:

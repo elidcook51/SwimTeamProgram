@@ -79,7 +79,7 @@ def seedChamps(allData, team):
     return outputString + f'\n Total Points Scored: {totPoints}'
 
 def seedDuelMeet(allData, team1, team2, year):
-    allData['Age'] = allData['Age'] + year - 2025
+    allData['Age'] = allData['Age'] + year - 2026
     ageRanges = help.getAgeGroups()
     genders = help.getGenders()
     outputs = []
@@ -97,7 +97,3 @@ def seedDuelMeet(allData, team1, team2, year):
     df = pd.merge(df, allData, on = 'Swimmer', how  = 'inner')
     df = fill.fillEvents(df)
     return df
-    
-    
-
-print(seedDuelMeet(allData, 'CITY', 'LMST', 2026))
