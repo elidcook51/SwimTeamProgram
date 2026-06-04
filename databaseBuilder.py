@@ -193,6 +193,8 @@ def checkOddTeamCases(line):
 def getFullData(folderPath):
     fullData = pd.DataFrame(columns = ['Team', 'Event', 'Swimmer', 'Time', 'Date'])
     for fileName in os.listdir(folderPath):
+        if fileName.endswith('.csv'):
+            continue
         filePath = os.path.join(folderPath, fileName)
         reader = PdfReader(filePath)
         if len(reader.pages[0].extract_text().splitlines()) > 1:
@@ -244,12 +246,13 @@ def getAgeGender(eventNum):
     else:
         return age, 'M'
 
-def addSwimmer(name, eventNum, team):
+def addSwimmer(name, eventNum, team, date, curYear):
+    timeDiff = curYear - date.year
     age, gender = getAgeGender(eventNum)
     dict = {
         'Swimmer': name,
         'Gender': gender,
-        'Age': age,
+        'Age': age + timeDiff,
         'Team': team,
         'sf': -1,
         'ba': -1,
@@ -269,13 +272,15 @@ def getEventType(eventNum):
     return eventTypes[num]
 
 def fullDataTransform(fullData):
+    fullData['Date'] = pd.to_datetime(fullData['Date'], format = 'mixed', errors = 'coerce')
+    curYear = fullData['Date'].dt.year.max()
     dataBase = pd.DataFrame(columns = ['Swimmer', 'Gender', 'Age', 'Team', 'sf', 'ba', 'br', 'fl', 'lf', 'im'])
     for index, row in fullData.iterrows():
         if row['Event'] in ['81', '82', '83', '84', '85', '86', '87', '88', '89', '90']:
             continue
         name = row['Swimmer']
         if name not in dataBase['Swimmer'].values:
-            dataBase = dataBase._append(addSwimmer(name, row['Event'], row['Team']), ignore_index = True)
+            dataBase = dataBase._append(addSwimmer(name, row['Event'], row['Team'], row['Date'], curYear), ignore_index = True)
         event = getEventType(row['Event'])
         dataBase.set_index('Swimmer', inplace = True)
         if dataBase.loc[name, event] == -1:
@@ -356,11 +361,11 @@ def getChampsResults(champsFolder):
         for page in reader.pages:
             text = page.extract_text()
 
-jslPath = "C:/Users/ucg8nb/JSL All Results 2021-2025"
+# jslPath = "C:/Users/ucg8nb/JSL All Results 2021-2025"
 # fullData = getFullData(jslPath)
 # fullData.to_csv(f"{jslPath}/Untransformed Data.csv")
-fullData = pd.read_csv(f"{jslPath}/Untransformed Data.csv")
-transData = fullDataTransform(fullData)
-transData.to_csv(f"{jslPath}/Transformed Data.csv")
+# fullData = pd.read_csv(f"{jslPath}/Untransformed Data.csv")
+# transData = fullDataTransform(fullData)
+# transData.to_csv(f"{jslPath}/Transformed Data.csv")
 
 

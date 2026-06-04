@@ -3,10 +3,11 @@ import relayHelp as relay
 import individualScore as ind
 import seedingHelp as help
 import databaseBuilder as db
+import fillingEvents as fill
 import pandas as pd
 import numpy as np
 
-allData = pd.read_csv("C:/Users/ucg8nb/Downloads/Full Swim Data.csv")
+allData = pd.read_csv("C:/Users/ucg8nb/JSL All Results 2021-2025\Transformed Data.csv")
 
 def createAllData(jslWebsiteLink, outputPath):
     db.getFullResults(jslWebsiteLink, 'Current Data')
@@ -77,18 +78,26 @@ def seedChamps(allData, team):
             outputString += resultsToString(x_vals,y_vals, incData, allData)
     return outputString + f'\n Total Points Scored: {totPoints}'
 
-def seedDuelMeet(allData, team1, team2):
+def seedDuelMeet(allData, team1, team2, year):
+    allData['Age'] = allData['Age'] + year - 2025
     ageRanges = help.getAgeGroups()
     genders = help.getGenders()
-    outputString = ''
-    team1Points = 0
-    team2Points = 0
+    outputs = []
     for a in ageRanges:
         for g in genders:
-            tempDf = ind.ScoreOneteamDuel(allData, a, g, team1, team2)
+            tempDf = ind.scoreOneTeamDuel(allData, a, g, team1, team2)
             tempDf = ind.dataframePlaceToScoreDuel(tempDf)
             x_vals = algorithms.noRelayProgram(tempDf)
-            print(x_vals)
+            outputs.append(x_vals)
+    combined = pd.concat(outputs)
+    df = combined.unstack(fill_value=0)
+    df = df.reset_index()
+    df.columns = [col if isinstance(col, str) else col[-1] for col in df.columns]
+    df = df.rename(columns = {'': 'Swimmer', 'sf': 'in_sf', 'ba': 'in_ba', 'br': 'in_br', 'fl': 'in_fl', 'lf': 'in_lf', 'im': 'in_im'})
+    df = pd.merge(df, allData, on = 'Swimmer', how  = 'inner')
+    df = fill.fillEvents(df)
+    return df
+    
+    
 
-
-print(seedDuelMeet(allData, 'CITY', 'LMST'))
+print(seedDuelMeet(allData, 'CITY', 'LMST', 2026))
