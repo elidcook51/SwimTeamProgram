@@ -126,7 +126,7 @@ def scoreOneTeamDuel(allData, ageRange, gender, team1, team2):
             if strokeTime == -1:
                 strokes.append(-1)
             else:
-                strokes.append(findIndexInList(times, strokeTime))
+                strokes.append(findIndexInList(times, strokeTime) + 1)
         newRow = {
             'Swimmer': swimmer,
             'Gender': gender,

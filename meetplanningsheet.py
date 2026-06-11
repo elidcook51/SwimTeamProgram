@@ -15,9 +15,9 @@ from copy import deepcopy
 # -------------------------------
 # Load data
 # -------------------------------
-participants = pd.read_csv("C:/Users/ucg8nb/Downloads/cityswordfishteam_meet_participants_260603130423.csv")
+participants = pd.read_csv("C:/Users/ucg8nb/Downloads/cityswordfishteam_meet_participants_260604093334.csv")
 times = pd.read_csv("C:/Users/ucg8nb/Downloads/best_times.csv")
-allData = pd.read_csv("C:/Users/ucg8nb/JSL All Results 2021-2025\Transformed Data.csv")
+allData = pd.read_csv("C:/Users/ucg8nb/JSL All Results 2021-2025/Transformed Data.csv")
 timeAllData = deepcopy(allData)
 
 # Normalize name keys

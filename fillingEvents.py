@@ -3,7 +3,7 @@ import seedingHelp as help
 
 events = ['sf', 'ba', 'br', 'fl', 'lf', 'im']
 
-def fillEvents(bigDf):
+def fillEvents(bigDf, max_events, max_event_size):
     ageRanges = help.getAgeGroups()
     genders = help.getGenders()
     outputDf = pd.DataFrame()

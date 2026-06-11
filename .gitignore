@@ -1,4 +1,5 @@
 .venv
 Relay Position Folder
-*.csv
-__pycache__
+/*.csv
+pycache/*
+*/pycache/*

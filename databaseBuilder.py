@@ -92,7 +92,7 @@ def getSwimmer(line):
     lastName = line[start+1:line.find(',')]
     lastName = lastName.replace('-','')
     firstName = line[line.find(',') + 1:stop]
-    return firstName + ' ' + lastName
+    return (firstName + ' ' + lastName).lstrip()
 
 def getPoolType(team):
     LCM = ['ACAC', 'FSBC']
@@ -268,6 +268,8 @@ def getEventType(eventNum):
     if 'P' in str(eventNum):
         eventNum = int(eventNum[:-1])
     eventNum = int(eventNum)
+    if eventNum > 100:
+        eventNum = eventNum / 10
     eventTypes = ['im', '', 'sf', 'br', 'ba', 'fl', 'lf']
     num = int((eventNum -1) / 10)
     return eventTypes[num]
@@ -276,6 +278,8 @@ def check25Event(eventNum):
     if "P" in str(eventNum):
         return True
     eventNum = int(eventNum)
+    if eventNum > 99:
+        return True
     if (eventNum - 1) % 10 < 2:
         return True
     return False
@@ -289,7 +293,7 @@ def fullDataTransform(fullData):
     for index, row in fullData.iterrows():
         if row['Time'] == -1:
             continue
-        if row['Event'] in ['81', '82', '83', '84', '85', '86', '87', '88', '89', '90']:
+        if row['Event'] in ['81', '82', '83', '84', '85', '86', '87', '88', '89', '90', '100']:
             continue
         name = row['Swimmer']
         if pd.isna(row['Swimmer']) or 'nan' in name or name.strip() == '' or 'Event' in name or 'AgeName' in name:
@@ -298,17 +302,14 @@ def fullDataTransform(fullData):
             dataBase = dataBase._append(addSwimmer(name, row['Event'], row['Team'], row['Date'], curYear), ignore_index = True)
         event = getEventType(row['Event'])
         if check25Event(row['Event']) and dataBase.loc[(dataBase['Swimmer'] == name) & (dataBase['Team'] == row['Team']), 'Age'].iloc[0] > 8:
-            if "P" not in row['Event']:
-                if int(int(row['Event']) / 10) == 6:
-                    event = 'sf'
+            if not isinstance(row['Event'], (int, float)):
+                if "P" not in row['Event']:
+                    if int(int(row['Event']) / 10) == 6:
+                        event = 'sf'
+                    else:
+                        continue
                 else:
                     continue
-            else:
-                continue
-        if name == ' Samuel Johnson' and row['Team'] == 'CITY':
-            print(row)
-        if name == ' Samuel Johnson':
-            print(row)
         if dataBase.loc[(dataBase['Swimmer'] == name) & (dataBase['Team'] == row['Team']), event].iloc[0] == -1:
             dataBase.loc[(dataBase['Swimmer'] == name) & (dataBase['Team'] == row['Team']), event] = row['Time']
         elif dataBase.loc[(dataBase['Swimmer'] == name) & (dataBase['Team'] == row['Team']), event].iloc[0] >= row['Time']:
@@ -375,22 +376,13 @@ def saveSpecificUrl(url, outputFolder):
     except Exception as e:
         print('retry program, big oopsie')
 
-def getChampsResults(champsFolder):
-    champsData = pd.DataFrame(columns=['Team', 'Event', 'Swimmer', 'Time', 'Date'])
-    for file in os.listdir(champsFolder):
-        filePath = os.path.join(champsFolder, file)
-        reader = PdfReader(filePath)
-        tempLine = reader.pages[0].extract_text().splitlines()[1]
-        year = tempLine[-4:]
-        readType = 1
-        for page in reader.pages:
-            text = page.extract_text()
-
-# jslPath = "C:/Users/ucg8nb/JSL All Results 2021-2025"
+jslPath = "C:/Users/ucg8nb/JSL All Results 2021-2025"
 # fullData = getFullData(jslPath)
 # fullData.to_csv(f"{jslPath}/Untransformed Data.csv")
-# fullData = pd.read_csv(f"{jslPath}/Untransformed Data.csv")
-# transData = fullDataTransform(fullData)
-# transData.to_csv(f"{jslPath}/Transformed Data.csv")
+fullData = pd.read_csv(f"{jslPath}/Untransformed Data.csv")
+second_full_data = pd.read_csv('C:/Users/ucg8nb/JSL All Champs Results/2025 Champs.csv')
+fullData = pd.concat([fullData, second_full_data])
+transData = fullDataTransform(fullData)
+transData.to_csv(f"{jslPath}/Transformed Data.csv")
 
 

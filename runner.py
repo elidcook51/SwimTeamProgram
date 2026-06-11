@@ -95,5 +95,6 @@ def seedDuelMeet(allData, team1, team2, year):
     df.columns = [col if isinstance(col, str) else col[-1] for col in df.columns]
     df = df.rename(columns = {'': 'Swimmer', 'sf': 'in_sf', 'ba': 'in_ba', 'br': 'in_br', 'fl': 'in_fl', 'lf': 'in_lf', 'im': 'in_im'})
     df = pd.merge(df, allData, on = 'Swimmer', how  = 'inner')
-    df = fill.fillEvents(df)
+    df = fill.fillEvents(df, max_events = 2, max_event_size = 12)
     return df
+
