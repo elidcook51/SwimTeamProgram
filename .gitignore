@@ -2,4 +2,5 @@
 Relay Position Folder
 /*.csv
 pycache/*
-*/pycache/*
+*/__pycache__/*
+C:\Users\ucg8nb\Python Projects\SwimTeamProgram\__pycache__

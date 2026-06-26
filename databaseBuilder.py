@@ -3,7 +3,18 @@ import pandas as pd
 import os
 import requests
 from bs4 import BeautifulSoup
+from urllib.parse import urljoin
+import cloudscraper
+import fitz
+import pytesseract
+from pdf2image import convert_from_path
+import re
+import shutil
+from sklearn.cluster import DBSCAN
 
+pytesseract.pytesseract.tesseract_cmd = r"C:/Program Files/Tesseract-OCR/tesseract.exe"
+
+HEADERS = {'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36'),'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8','Accept-Language': 'en-US,en;q=0.9','Accept-Encoding': 'gzip, deflate, br','Cache-Control': 'no-cache','Pragma': 'no-cache','DNT': '1','Upgrade-Insecure-Requests': '1'}
 
 relayNums = ['1P', 1, 2]
 for i in range(11,21):
@@ -15,6 +26,20 @@ eventNums = ['21P', '22P', '41P', '42P']
 for j in range(1, 11):
     for i in [0, 10, 20, 30, 40, 50, 60, 70]:
         eventNums.append(i + j)
+
+swimTopiaEventMap = {
+    e: 'sf'   for e in range(22, 34)
+} | {
+    e: 'br' for e in range(34, 44)
+} | {
+    e: 'ba'   for e in range(44, 56)
+} | {
+    e: 'fl'    for e in range(56, 66)
+} | {
+    e: 'lf'    for e in range(66, 76)
+} | {
+    e: 'im'           for e in range(4, 12)
+}
 
 def convertTimes(list, sort):
     if sort:
@@ -35,11 +60,11 @@ def timeInMinutes(time):
         return str(minutes) + ':' + str(time)[:5]
     else:
         return str(minutes) + ':0' + str(time)[:4]
+
 def appendDict(df, dict):
     tempDf = pd.DataFrame(dict)
     df = df._append(tempDf, ignore_index = True)
     return df
-
 
 def readEvent(line):
     end = 0
@@ -376,13 +401,249 @@ def saveSpecificUrl(url, outputFolder):
     except Exception as e:
         print('retry program, big oopsie')
 
-jslPath = "C:/Users/ucg8nb/JSL All Results 2021-2025"
+def pullSwimTopiaResults(url, outputFolder):
+    if outputFolder.is_dir():
+        shutil.rmtree(outputFolder)
+
+    scraper = cloudscraper.create_scraper()
+
+    html = scraper.get(url).text
+    
+    os.makedirs(outputFolder, exist_ok = True)
+    soup = BeautifulSoup(html, 'html.parser')
+
+
+    for link in soup.find_all('a', href = True):
+        href = link['href']
+
+        print(href)
+
+        if "s3_files" in href:
+            file_url = urljoin(url, href)
+
+            name = link.get_text(strip = True)
+            invalid_chars = r'<>:"/\|?*'
+            for ch in invalid_chars:
+                name = name.replace(ch, "")
+
+            filename = os.path.join(outputFolder, f"{name}.pdf")
+
+            print(f"Downloading: {file_url}")
+
+            
+            response = scraper.get(file_url, headers=HEADERS, stream=True)
+
+            # DEBUG: check what you're actually getting
+            print(response.headers.get("Content-Type"))
+
+            if "application/pdf" not in response.headers.get("Content-Type", ""):
+                print("Not a PDF! Skipping:", file_url)
+                continue
+
+            with open(filename, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+
+
+    print('Done!')
+
+def parseSwimTopiaText(text):
+    # Extract date
+    date_match = re.search(r'([A-Za-z]{3,9})\s+(\d{1,2}),?\s*(\d{4})', text)
+    meet_date = date_match.group(1) if date_match else None
+
+    # Clean weird header corruption
+    text = re.sub(r'#\s+(\d+)', r'#\1', text)
+
+    # Split into events FIRST (preserve structure)
+    event_splits = re.split(r'(#\d+)', text)
+
+    rows = []
+
+    for i in range(1, len(event_splits), 2):
+        event_num = int(event_splits[i][1:])
+        chunk = event_splits[i + 1]
+
+        if "Relay" in chunk:
+            continue
+
+        # Flatten ONLY inside this event
+        chunk = chunk.replace('\n', ' ')
+        chunk = re.sub(r'\s+', ' ', chunk)
+
+        # Remove EXH / DQ / NS
+        chunk = re.sub(r'\b(EXH|DQ|NS)\b', '', chunk)
+        chunk = re.sub(r'[=~•*©§\|\\]+', '', chunk)
+
+        # --- MAIN PATTERN ---
+        pattern = re.compile(
+            r'(?:^|\s)'
+            r'(?:\d+\s*[\.\)]?\s*)?'  # optional placing
+            
+            # --- NAME ---
+            r'([A-Za-z\'\-]+),\s*([A-Za-z\.]+(?:\s+[A-Za-z\.]+)*)\s+'
+
+            # Optional stray numbers (place column leaks)
+            r'(?:\d+\s+)?'
+
+            # --- AGE ---
+            r'(\d{1,2})\s+'
+
+            # --- TEAM ---
+            r'([A-Z]{3,5})\s+'
+
+            # Optional NT / seed time(s)
+            r'(?:NT\s+)?'
+            r'(?:[\d:]+\.\d+\s+)*'
+
+            # --- FINAL TIME ---
+            r'((?:\d{1,2}:)?\d{1,2}\.\d{2})'
+
+            # Optional trailing junk (points, etc.)25    
+            r'(?:\s+\d+)?'
+        )
+
+        for m in pattern.finditer(chunk):
+            last, first, age, team, time_str = m.groups()
+
+            last = last.strip()
+            first = first.strip()
+
+            # Convert time
+            if ':' in time_str:
+                mins, secs = time_str.split(':')
+                time = int(mins) * 60 + float(secs)
+            else:
+                time = float(time_str)
+
+            rows.append({
+                "Team": team,
+                "Event": event_num,
+                "Swimmer": f"{first.strip()} {last.strip()}",
+                "Time": time,
+                "Age": int(age),
+                "Date": meet_date
+            })
+
+    df = pd.DataFrame(rows)
+
+    # Final cleanup
+    df = df[df["Swimmer"].str.len() > 4]
+
+    return df
+
+def group_lines(df):
+    y_positions = df['top'].values.reshape(-1,1)
+
+    clustering = DBSCAN(eps = 8, min_samples = 1).fit(y_positions)
+
+    df['line_id'] = clustering.labels_
+    grouped = df.groupby('line_id')
+
+    lines = []
+    for _, group in grouped:
+        line = " ".join(group.sort_values('left')['text'])
+        lines.append((group['top'].mean(), line))
+    
+    return pd.DataFrame(lines, columns = ['top', 'line'])
+
+def readSwimTopiaResults(folderPath):
+    fullData = pd.DataFrame(columns=['Team', 'Event', 'Swimmer', 'Time', "Age", 'Date'])
+    for fileName in os.listdir(folderPath):
+        print("Processing:", fileName)
+
+        filePath = os.path.join(folderPath, fileName)
+
+        # Convert PDF to images
+        pages = convert_from_path(filePath)
+
+        full_text = []
+
+        for page in pages:
+            data = pytesseract.image_to_data(page, config = '--psm 6', output_type = pytesseract.Output.DATAFRAME)
+
+            data = data.dropna(subset = ['text'])
+            data = data[data['text'].str.strip() != ""]
+
+            page_width = page.width  # or image width2split_x = page_width * 0.5  # tweak this (0.45–0.6 usually)
+            split_x = page_width * 0.5
+
+            left_col = data[data['left'] < split_x].sort_values(by = ['top', 'left'])
+            right_col = data[data['left'] >= split_x].sort_values(by = ['top','left'])
+
+            left_lines = group_lines(left_col).sort_values('top')
+            right_lines = group_lines(right_col).sort_values('top')
+
+            page_text = " ".join(left_lines['line']) + " " + " ".join(right_lines['line'])
+            full_text.append(page_text)
+        
+        text = "\n".join(full_text)
+        with open("C:/Users/ucg8nb/Downloads/meet_results.txt", 'a') as f:
+            f.write(text)
+
+        meetDf = parseSwimTopiaText(text)
+
+        fullData = pd.concat([fullData, meetDf], ignore_index = True)
+
+    return fullData
+
+def gender_from_swimtopia_event(num):
+    if num % 2 == 0:
+        return "M"
+    else:
+        return "W"
+
+def transformSwimTopiaResults(df):
+    df = df.copy()
+
+    df['stroke'] = df['Event'].map(swimTopiaEventMap)
+    df['Gender'] = df['Event'].map(gender_from_swimtopia_event)
+
+    df = df.dropna(subset = ['stroke'])
+
+    fastest = (df.groupby(['Swimmer', 'stroke'], as_index = False)['Time'].min())
+
+    wide = fastest.pivot(index = 'Swimmer', columns = 'stroke', values = 'Time')
+
+    expected_cols = [
+        'sf',
+        'ba',
+        'br',
+        'fl',
+        'lf',
+        'im'
+    ]
+
+    for col in expected_cols:
+        if col not in wide.columns:
+            wide[col] = pd.NA
+
+    meta = (
+        df.sort_values('Time').groupby('Swimmer').first()[['Age', 'Team', 'Gender']].reset_index()
+    )
+
+    result = meta.merge(wide, on = 'Swimmer', how = 'left')
+
+    return result
+
+# swimtopiaResults = 'https://jsl.swimtopia.com/full-results'
+swimTopiaResultsFolder = "C:/Users/ucg8nb/Downloads/2026 Results"
+# pullSwimTopiaResults(swimtopiaResults, swimTopiaResultsFolder)
+
+df = readSwimTopiaResults(swimTopiaResultsFolder)
+df.to_csv("C:/Users/ucg8nb/Downloads/Untransformed 2026.csv")
+
+df = pd.read_csv("C:/Users/ucg8nb/Downloads/Untransformed 2026.csv")
+transformeddf = transformSwimTopiaResults(df)
+transformeddf.to_csv("C:/Users/ucg8nb/Downloads/Transformed 2026.csv")
+
+# jslPath = "C:/Users/ucg8nb/JSL All Results 2021-2025"
 # fullData = getFullData(jslPath)
 # fullData.to_csv(f"{jslPath}/Untransformed Data.csv")
-fullData = pd.read_csv(f"{jslPath}/Untransformed Data.csv")
-second_full_data = pd.read_csv('C:/Users/ucg8nb/JSL All Champs Results/2025 Champs.csv')
-fullData = pd.concat([fullData, second_full_data])
-transData = fullDataTransform(fullData)
-transData.to_csv(f"{jslPath}/Transformed Data.csv")
+# fullData = pd.read_csv(f"{jslPath}/Untransformed Data.csv")
+# second_full_data = pd.read_csv('C:/Users/ucg8nb/JSL All Champs Results/2025 Champs.csv')
+# fullData = pd.concat([fullData, second_full_data])
+# transData = fullDataTransform(fullData)
+# transData.to_csv(f"{jslPath}/Transformed Data.csv")
 
 

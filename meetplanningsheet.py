@@ -15,9 +15,14 @@ from copy import deepcopy
 # -------------------------------
 # Load data
 # -------------------------------
-participants = pd.read_csv("C:/Users/ucg8nb/Downloads/cityswordfishteam_meet_participants_260604093334.csv")
+
+#Edit these things every meet
+participants = pd.read_csv("C:/Users/ucg8nb/Downloads/cityswordfishteam_meet_participants_260626095508.csv")
 times = pd.read_csv("C:/Users/ucg8nb/Downloads/best_times.csv")
-allData = pd.read_csv("C:/Users/ucg8nb/JSL All Results 2021-2025/Transformed Data.csv")
+allData = pd.read_csv("C:/Users/ucg8nb/Downloads/Transformed 2026.csv")
+oppTeam = 'FSBC'
+immeet = True
+
 timeAllData = deepcopy(allData)
 
 # Normalize name keys
@@ -29,8 +34,6 @@ times = times.sort_values("ConvertedHundredths").drop_duplicates(["Name", "Event
 
 # Pivot times into columns
 times_pivot = times.pivot(index="Name", columns="Event", values="ConvertedTime")
-
-
 
 # -------------------------------
 # Helpers
@@ -51,10 +54,15 @@ def get_gender(label):
 
 def get_events(age_group):
     if age_group in ["5-6", "7-8"]:
-        return ["25 Freestyle", "25 Backstroke", "25 Breaststroke", "25 Butterfly", "50 Freestyle"]
+        if not immeet:
+            return ["25 Freestyle", "25 Breaststroke","25 Backstroke", "25 Butterfly", '50 Freestyle']
+        else:
+            return ["25 Freestyle", "25 Breaststroke","25 Backstroke", "25 Butterfly",]
     else:
-        return ["50 Freestyle", "50 Backstroke", "50 Breaststroke", "50 Butterfly", "100 Freestyle", "100 Individual Medley"]
-
+        if not immeet:
+            return ["50 Freestyle", "50 Breaststroke", "50 Backstroke", "50 Butterfly", "100 Freestyle"]
+        else:
+            return ["50 Freestyle", "50 Breaststroke", "50 Backstroke", "50 Butterfly", "100 Individual Medley"]
 
 def get_event_flag(event, age):
     # 8 & under (25s + 50 free)
@@ -105,13 +113,23 @@ def get_event_flag_time(event, age):
 def format_val(val):
     if pd.isna(val) or val == "":
         return ""
-    
-    val = round(float(val), 4)
 
-    minutes = int(val // 60)
-    seconds = val % 60
+    # Convert to string for consistent handling
+    val_str = str(val).strip().replace("S", "")
 
-    seconds = round(seconds,4)
+    # ✅ If already in mm:ss format → return cleaned
+    if ":" in val_str:
+        return val_str
+
+    # ✅ Otherwise treat as numeric seconds
+    try:
+        val_float = round(float(val_str), 4)
+    except ValueError:
+        return ""
+
+    minutes = int(val_float // 60)
+    seconds = val_float % 60
+    seconds = round(seconds, 4)
 
     if minutes != 0:
         if seconds < 10:
@@ -141,7 +159,6 @@ allData = allData[allData['Team'] != 'CITY']
 allData = allData.dropna()
 participants['lowerName'] = participants['Name'].str.strip().str.lower()
 cityData['lowerName'] = cityData['Swimmer'].str.strip().str.lower()
-
 cityData = participants[['lowerName', 'Name', 'athlete_age', 'athlete_age_group']].merge(cityData[['lowerName', 'sf', 'ba', 'br', 'fl', 'lf', 'im']], on = 'lowerName', how = 'left').fillna(-1)
 cityData['Gender'] = cityData['athlete_age_group'].apply(get_gender)
 cityData['Team'] = "CITY"
@@ -149,7 +166,7 @@ cityData = cityData.rename(columns = {'athlete_age': 'Age', 'Name': "Swimmer"})
 cityData = cityData.drop(columns = ['lowerName', 'athlete_age_group'])
 allData = pd.concat([allData, cityData])
 allData = swimmerRegression.standardizeAllData(allData)
-results = runner.seedDuelMeet(allData, 'CITY', 'LMST', 2026)
+results = runner.seedDuelMeet(allData, 'CITY', oppTeam, 2026)
 
 # -------------------------------
 # Prepare participants
@@ -197,21 +214,27 @@ for age in age_groups:
             for col_idx, event in enumerate(events, start = 1):
                 val = ""
 
-                cur_row = timeAllData[timeAllData["Swimmer"].str.strip().str.lower() == name.strip().lower()]
-                cur_row = cur_row[cur_row['Team'] == 'CITY']
+                # cur_row = timeAllData[timeAllData["Swimmer"].str.strip().str.lower() == name.strip().lower()]
+                # cur_row = cur_row[cur_row['Team'] == 'CITY']
 
-                flag_col = get_event_flag_time(event, age)
+                # flag_col = get_event_flag_time(event, age)
 
-                val = ""
+                # val = ""
 
-                if (
-                    not cur_row.empty
-                    and flag_col in cur_row.columns
-                ):
-                    val = cur_row.iloc[0][flag_col]
+                # if (
+                #     not cur_row.empty
+                #     and flag_col in cur_row.columns
+                # ):
+                #     val = cur_row.iloc[0][flag_col]
 
-                    # Clean missing values
-                    if pd.isna(val) or val <= 0:
+                #     # Clean missing values
+                #     if pd.isna(val) or val <= 0:
+                #         val = ""
+
+                if name in times_pivot.index and event in times_pivot.columns:
+                    val = times_pivot.loc[name, event]
+
+                    if pd.isna(val) or val == "":
                         val = ""
 
                 row_data.append(format_val(val))
@@ -233,7 +256,7 @@ for age in age_groups:
 
         name_col_width = page_width * 0.25
 
-        other_width = (page_width - name_col_width) / (num_cols - 1)
+        other_width = max(50, (page_width - name_col_width) / (num_cols - 1))
         col_widths = [name_col_width] + [other_width] * (num_cols - 1)
 
         table = Table(data, colWidths=col_widths)
@@ -248,7 +271,10 @@ for age in age_groups:
         elements.append(Paragraph(title_text, styles['Heading2']))
         elements.append(table)
 
-        oppTimes = ind.oppTimes(timeAllData, age_group_to_range(age), gender, 'LMST')
+        oppTimes = ind.oppTimes(timeAllData, age_group_to_range(age), gender, oppTeam)
+        oppTimes = oppTimes.apply(pd.to_numeric, errors = 'coerce')
+        oppTimes = oppTimes.apply(lambda col: col.sort_values(ignore_index = True))
+        print(oppTimes)
         for index, row in oppTimes.iterrows():
 
             if age == '5-6' or age == '7-8':
@@ -262,6 +288,7 @@ for age in age_groups:
             times_row.setStyle(TableStyle([
                 ("ALIGN", (0, 0), (-1, -1), "LEFT"),
                 ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("FONTSIZE", (0,0), (-1,-1), 12),
             ]))
 
             elements.append(times_row)

@@ -108,7 +108,10 @@ def scoreOneTeam(allData, ageRange, gender, team):
 
 def scoreOneTeamDuel(allData, ageRange, gender, team1, team2):
     topTwo = seedOtherTeams(allData, ageRange, gender)
-    team2Top2 = topTwo[topTwo['Team'] == team2]
+    if topTwo.empty:
+        team2Top2 = pd.DataFrame()
+    else:
+        team2Top2 = topTwo[topTwo['Team'] == team2]
     team1Data = allData[allData['Team'] == team1]
     team1Data = team1Data[team1Data['Age'].isin(ageRange)]
     team1Data = team1Data[team1Data['Gender'] == gender]
@@ -119,14 +122,22 @@ def scoreOneTeamDuel(allData, ageRange, gender, team1, team2):
         age = row['Age']
         team = row['Team']
         strokes = []
-        for s in help.getStrokes():
-            tempTopTwo = team2Top2[team2Top2['Stroke'] == s]
-            times = sorted(tempTopTwo['Time'].tolist())
-            strokeTime = row[s]
-            if strokeTime == -1:
-                strokes.append(-1)
-            else:
-                strokes.append(findIndexInList(times, strokeTime) + 1)
+        if team2Top2.empty:
+            for s in help.getStrokes():
+                strokeTime = row[s]
+                if strokeTime == -1:
+                    strokes.append(-1)
+                else:
+                    strokes.append(1)
+        else:
+            for s in help.getStrokes():
+                tempTopTwo = team2Top2[team2Top2['Stroke'] == s]
+                times = sorted(tempTopTwo['Time'].tolist())
+                strokeTime = row[s]
+                if strokeTime == -1:
+                    strokes.append(-1)
+                else:
+                    strokes.append(findIndexInList(times, strokeTime) + 1)
         newRow = {
             'Swimmer': swimmer,
             'Gender': gender,
@@ -144,9 +155,17 @@ def scoreOneTeamDuel(allData, ageRange, gender, team1, team2):
 
 def getOneTeamTopStrokeX(allData, ageRange, gender, team, stroke, X):
     tempDf = allData[allData['Team'] == team]
+    if tempDf.empty:
+        return []
     tempDf = tempDf[tempDf['Age'].isin(ageRange)]
+    if tempDf.empty:
+        return []
     tempDf = tempDf[tempDf['Gender'] == gender]
+    if tempDf.empty:
+        return []
     tempDf = tempDf[tempDf[stroke] != -1]
+    if tempDf.empty:
+        return []
     curList = tempDf[stroke].tolist()
     if len(curList) < X:
         curList = sorted(curList)
