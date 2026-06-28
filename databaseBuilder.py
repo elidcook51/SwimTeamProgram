@@ -1,3 +1,4 @@
+import seedingHelp as help
 from pypdf import PdfReader
 import pandas as pd
 import os
@@ -552,6 +553,9 @@ def readSwimTopiaResults(folderPath):
     for fileName in os.listdir(folderPath):
         print("Processing:", fileName)
 
+        home = fileName.split('@')[-1].strip()
+        home = home.replace(".pdf", "")
+
         filePath = os.path.join(folderPath, fileName)
 
         # Convert PDF to images
@@ -582,6 +586,9 @@ def readSwimTopiaResults(folderPath):
             f.write(text)
 
         meetDf = parseSwimTopiaText(text)
+        meetDf['Time'] = meetDf['Time'].apply(lambda t: help.toSCM(home, t))
+
+        #FIX TO GET YARDS TIMES CORRECT!
 
         fullData = pd.concat([fullData, meetDf], ignore_index = True)
 

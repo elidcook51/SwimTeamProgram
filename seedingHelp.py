@@ -45,6 +45,14 @@ def getAgeGenderTeam(df, ageRange, gender, team):
     df = df[df['Team'] == team]
     return df
 
+def toSCM(team, time):
+    if team in ['BHSC', 'KWC', 'LG', 'FSBC']:
+        return time * 1.019
+    if team in ['ACAC']:
+        return time * 0.911
+    else:
+        return time
+
 class Swimmer:
 
     def __init__(self, name, team, age, gender, times):
