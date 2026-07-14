@@ -3,6 +3,7 @@ import seedingHelp as help
 from itertools import combinations
 from itertools import permutations
 import numpy as np
+from collections import defaultdict
 
 def placeToScore(place):
     if place == -1:
@@ -114,10 +115,22 @@ def getUnecessarySwimmers(fastRunData):
                 possibleSwimmers.remove(s)
     return possibleSwimmers
 
+def get_relay_scores(relayScores):
+    team_scores = defaultdict(int)
+    rS = relayScores.copy()
+    rS['place'] = range(1, len(rS) + 1)
+    for _, row in rS.iterrows():
+        score = relayToScore(row['place'])
+        team_scores[row['Team']] += score
+    return team_scores
+
 
 def buildRelayPositions(allData, ageRange, gender, team, threeEventSwimmers):
     freeRelayScores = allRelayScores(allData, ageRange, gender, True)
     medleyRelayScores = allRelayScores(allData, ageRange, gender, False)
+    fr_team_scores = get_relay_scores(freeRelayScores)
+    mr_team_scores = get_relay_scores(medleyRelayScores)
+    team_scores = help.combine_team_scores(fr_team_scores, mr_team_scores)
     freeRelayScores = freeRelayScores[freeRelayScores['Team'] != team]
     medleyRelayScores = medleyRelayScores[medleyRelayScores['Team'] != team]
     freeRelayTimes = freeRelayScores['Time'].to_numpy()
@@ -128,7 +141,6 @@ def buildRelayPositions(allData, ageRange, gender, team, threeEventSwimmers):
     efficiencyHelper = smallData[~smallData['Swimmer'].isin(threeEventSwimmers)]
     remSwimmers = getUnecessarySwimmers(efficiencyHelper)
     smallData = smallData[~smallData['Swimmer'].isin(remSwimmers)]
-
 
     swimmers = smallData['Swimmer'].tolist()
     fl = smallData['fl'].tolist()
@@ -169,7 +181,7 @@ def buildRelayPositions(allData, ageRange, gender, team, threeEventSwimmers):
         outputDf = outputDf._append(combinedMedley, ignore_index = True)
         outputDf = outputDf._append(combinedFree, ignore_index = True)
         count += 1
-    return outputDf
+    return outputDf, team_scores
 
 def buildInc(relaysDf, swimmers):
     inc_rows = []

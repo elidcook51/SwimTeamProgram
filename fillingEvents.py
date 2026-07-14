@@ -1,5 +1,6 @@
 import pandas as pd
 import seedingHelp as help
+import numpy as np
 
 events = ['sf', 'ba', 'br', 'fl', 'lf', 'im']
 
@@ -51,3 +52,74 @@ def assign(df, max_events = 3, max_event_size = 12):
             df.loc[slowest_idx, f"in_{best}"] = 1
     
     return df
+
+def fillTo4(bigDf):
+    outputDf = pd.DataFrame()
+    for ageRange in help.getAgeGroups():
+        for gender in help.getGenders():
+            df = bigDf[bigDf['Age'].isin(ageRange)]
+            df = df[df['Gender'] == gender]
+            if 8 in ageRange:
+                strokes = help.getUnder8Strokes()
+            else:
+                strokes = help.getStrokes()
+
+            for stroke in strokes:
+                in_col = f"in_{stroke}"
+
+                while df[in_col].sum() < 4:
+                    candidates = df[df[in_col] == 0].copy()
+
+                    if candidates.empty:
+                        break
+
+                    idx = candidates[stroke].idxmin()
+                    df.loc[idx, in_col] = 1
+
+            changed = True
+            while changed:
+                changed = False
+
+                event_counts = df[[f"in_{s}" for s in strokes]].sum(axis = 1)
+
+                for swimmer_idx  in df.index[event_counts > 3]:
+                    entered = [
+                        s for s in strokes
+                        if df.loc[swimmer_idx, f"in_{s}"] == 1
+                    ]
+
+                    removable = []
+
+                    for s in entered:
+                        entrants = df[df[f"in_{s}"] == 1]
+                        rank = entrants[s].rank(method = 'first').loc[swimmer_idx]
+
+                        if rank >= 3:
+                            removable.append(s)
+                    
+                    if not removable:
+                        continue
+
+                    slowest = max(removable, key = lambda s: df.loc[swimmer_idx, s])
+
+                    df.loc[swimmer_idx, f"in_{slowest}"] = 0 
+                    changed = True
+            outputDf = pd.concat([outputDf, df])
+    return outputDf
+
+def fillEventsChamps(bigDf):
+    individuals = ['in_im', 'in_lf', 'in_sf', 'in_ba', 'in_br', 'in_fl']
+    inevents = ['in_im', 'in_lf', 'in_sf', 'in_ba', 'in_br', 'in_fl', 'in_fr', 'mr_fr', 'mr_ba', 'mr_br', 'mr_fl']
+    bigDf = fillTo4(bigDf)
+    for index, row in bigDf.iterrows():
+        numEvents = np.sum(row[inevents])
+        numInd = np.sum(row[individuals])
+        if numInd >= 2:
+            continue
+        if row['in_sf'] != 1:
+            bigDf.loc[index, 'in_sf'] = 1
+            numInd += 1
+            if numInd >= 2:
+                continue
+    return bigDf
+        

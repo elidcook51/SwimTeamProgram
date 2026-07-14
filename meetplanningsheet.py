@@ -5,10 +5,8 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.units import inch
 import swimmerRegression
-import runner
 import databaseBuilder as db
 import individualScore as ind
-from copy import deepcopy
 
 
 
@@ -17,23 +15,13 @@ from copy import deepcopy
 # -------------------------------
 
 #Edit these things every meet
-participants = pd.read_csv("C:/Users/ucg8nb/Downloads/cityswordfishteam_meet_participants_260626095508.csv")
-times = pd.read_csv("C:/Users/ucg8nb/Downloads/best_times.csv")
-allData = pd.read_csv("C:/Users/ucg8nb/Downloads/Transformed 2026.csv")
-oppTeam = 'FSBC'
-immeet = True
+# participants = pd.read_csv("C:/Users/ucg8nb/Downloads/cityswordfishteam_meet_participants_260702103221.csv")
+# times = pd.read_csv("C:/Users/ucg8nb/Downloads/best_times.csv")
+# allData = pd.read_csv("C:/Users/ucg8nb/Downloads/Transformed 2026.csv")
+# oppTeam = 'CGST'
+# immeet = False
 
-timeAllData = deepcopy(allData)
-
-# Normalize name keys
-participants["Name"] = participants["athlete_first_name"].fillna("") + " " + participants["athlete_last_name"]
-times["Name"] = times["FirstName"] + " " + times["LastName"]
-
-# Keep best (fastest) time per swimmer/event
-times = times.sort_values("ConvertedHundredths").drop_duplicates(["Name", "Event"])
-
-# Pivot times into columns
-times_pivot = times.pivot(index="Name", columns="Event", values="ConvertedTime")
+# timeAllData = deepcopy(allData)
 
 # -------------------------------
 # Helpers
@@ -52,13 +40,17 @@ def get_gender(label):
         return "M"
     return None
 
-def get_events(age_group):
+def get_events(age_group, immeet, champs = False):
     if age_group in ["5-6", "7-8"]:
+        if champs:
+            return ["25 Freestyle", "25 Breaststroke","25 Backstroke", "25 Butterfly", '50 Freestyle']
         if not immeet:
             return ["25 Freestyle", "25 Breaststroke","25 Backstroke", "25 Butterfly", '50 Freestyle']
         else:
             return ["25 Freestyle", "25 Breaststroke","25 Backstroke", "25 Butterfly",]
     else:
+        if champs:
+            return ["50 Freestyle", "50 Breaststroke", "50 Backstroke", "50 Butterfly", "100 Freestyle", '100 Individual Medley']
         if not immeet:
             return ["50 Freestyle", "50 Breaststroke", "50 Backstroke", "50 Butterfly", "100 Freestyle"]
         else:
@@ -138,6 +130,18 @@ def format_val(val):
 
     return f"{seconds:.2f}"
 
+def format_time_with_rank(time_text, rank, styles):
+    if pd.isna(time_text) or time_text == "":
+        return ""
+
+    if rank is None:
+        return str(time_text)
+
+    return Paragraph(
+        f"{time_text} <font size='6'>({rank})</font>",
+        styles["BodyText"]
+    )
+
 def age_group_to_range(ageGroup):
     if ageGroup == '5-6':
         return [5,6]
@@ -152,150 +156,200 @@ def age_group_to_range(ageGroup):
     if ageGroup == '15-18':
         return [15,16,17,18]
 
+def normalizeNameKeys(participants, times, rosterdf):
+    # Normalize name keys
+    name_map = (rosterdf.dropna(subset = ['AthletePreferredName']).set_index(['AthleteFirstName', 'AthleteLastName'])['AthletePreferredName'])
+    participants['athlete_first_name'] = (participants.apply(lambda r: name_map.get((r['athlete_first_name'], r['athlete_last_name']), r['athlete_first_name']) if pd.notna(r['athlete_first_name']) else r['athlete_first_name'], axis = 1))
+    times['FirstName'] = (times.apply(lambda r: name_map.get((r['FirstName'], r['LastName']), r['FirstName']) if pd.notna(r['FirstName']) else r['FirstName'], axis = 1))
+    participants["Name"] = participants["athlete_first_name"].fillna("") + " " + participants["athlete_last_name"]
+    times["Name"] = times["FirstName"] + " " + times["LastName"]
 
-#Clean allData
-cityData = allData[allData['Team'] == 'CITY']
-allData = allData[allData['Team'] != 'CITY']
-allData = allData.dropna()
-participants['lowerName'] = participants['Name'].str.strip().str.lower()
-cityData['lowerName'] = cityData['Swimmer'].str.strip().str.lower()
-cityData = participants[['lowerName', 'Name', 'athlete_age', 'athlete_age_group']].merge(cityData[['lowerName', 'sf', 'ba', 'br', 'fl', 'lf', 'im']], on = 'lowerName', how = 'left').fillna(-1)
-cityData['Gender'] = cityData['athlete_age_group'].apply(get_gender)
-cityData['Team'] = "CITY"
-cityData = cityData.rename(columns = {'athlete_age': 'Age', 'Name': "Swimmer"})
-cityData = cityData.drop(columns = ['lowerName', 'athlete_age_group'])
-allData = pd.concat([allData, cityData])
-allData = swimmerRegression.standardizeAllData(allData)
-results = runner.seedDuelMeet(allData, 'CITY', oppTeam, 2026)
+    # Keep best (fastest) time per swimmer/event
+    times = times.sort_values("ConvertedHundredths").drop_duplicates(["Name", "Event"])
 
-# -------------------------------
-# Prepare participants
-# -------------------------------
-participants["AgeGroup"] = participants["athlete_age_group"].apply(get_age_group_label)
-participants["Gender"] = participants["athlete_age_group"].apply(get_gender)
+    # Pivot times into columns
+    times_pivot = times.pivot(index="Name", columns="Event", values="ConvertedTime")
 
-participants = participants.dropna(subset=["AgeGroup", "Gender"])
+    # -------------------------------
+    # Prepare participants
+    # -------------------------------
+    participants["AgeGroup"] = participants["athlete_age_group"].apply(get_age_group_label)
+    participants["Gender"] = participants["athlete_age_group"].apply(get_gender)
 
-# -------------------------------
-# Build PDF
-# -------------------------------
-doc = SimpleDocTemplate("C:/Users/ucg8nb/Downloads/meet_plan.pdf", leftMargin = 0, rightMargin = 0)
-styles = getSampleStyleSheet()
-styles["Heading2"].alignment = TA_CENTER
-elements = []
+    participants = participants.dropna(subset=["AgeGroup", "Gender"])
 
-age_groups = ["5-6", "7-8", "9-10", "11-12", "13-14", "15-18"]
+    return participants, times_pivot
 
-page_width = doc.width
+def cleanAllData(allData, participants):
+    #Clean allData
+    cityData = allData[allData['Team'] == 'CITY']
+    allData = allData[allData['Team'] != 'CITY']
+    allData = allData.dropna()
+    participants['lowerName'] = participants['Name'].str.strip().str.lower()
+    cityData['lowerName'] = cityData['Swimmer'].str.strip().str.lower()
+    cityData = participants[['lowerName', 'Name', 'athlete_age', 'athlete_age_group']].merge(cityData[['lowerName', 'sf', 'ba', 'br', 'fl', 'lf', 'im']], on = 'lowerName', how = 'left').fillna(-1)
+    cityData['Gender'] = cityData['athlete_age_group'].apply(get_gender)
+    cityData['Team'] = "CITY"
+    cityData = cityData.rename(columns = {'athlete_age': 'Age', 'Name': "Swimmer"})
+    cityData = cityData.drop(columns = ['lowerName', 'athlete_age_group'])
+    allData = pd.concat([allData, cityData])
+    allData['Swimmer'] = allData['Swimmer'].str.strip().str.lower()
+    return allData, cityData
 
-for age in age_groups:
-    for gender in ["W", "M"]:
-        group = participants[(participants["AgeGroup"] == age) & (participants["Gender"] == gender)]
+# Map event names to the corresponding CITY time column
+event_to_col = {
+    "25 Freestyle": "sf",
+    "50 Freestyle": "sf",
+    "25 Backstroke": "ba",
+    "50 Backstroke": "ba",
+    "25 Breaststroke": "br",
+    "50 Breaststroke": "br",
+    "25 Butterfly": "fl",
+    "50 Butterfly": "fl",
+    "100 Freestyle": "lf",
+    "100 Individual Medley": "im"
+}
 
-        if group.empty:
-            continue
+age_groups = ['5-6', '7-8', '9-10', '11-12', '13-14', '15-18']
 
-        events = get_events(age)
+def getCityRanks(cityData):
 
-        # Table header
-        data = [["Name"] + events]
+    # Store ranks by age/gender/event/swimmer
+    city_ranks = {}
 
-        cell_styles = []
+    for age in age_groups:
+        age_range = age_group_to_range(age)
 
-        for row_idx, (_, swimmer_row) in enumerate(group.iterrows(), start = 1):
-            name = swimmer_row["Name"]
+        for gender in ["W", "M"]:
 
-            row_name = f"{name} ({swimmer_row['athlete_age']})"
+            subset = cityData[
+                (cityData["Gender"] == gender) &
+                (cityData["Age"].isin(age_range))
+            ]
 
-            row_data = [row_name]
+            for event, col in event_to_col.items():
 
-            swimmer_flags = results[results['Swimmer'] == name]
+                valid = subset[subset[col] > 0].copy()
 
-            for col_idx, event in enumerate(events, start = 1):
-                val = ""
+                if len(valid) == 0:
+                    continue
 
-                # cur_row = timeAllData[timeAllData["Swimmer"].str.strip().str.lower() == name.strip().lower()]
-                # cur_row = cur_row[cur_row['Team'] == 'CITY']
+                # Fastest time gets rank 1
+                valid["Rank"] = valid[col].rank(method="min", ascending=True)
 
-                # flag_col = get_event_flag_time(event, age)
+                for _, row in valid.iterrows():
+                    city_ranks[(age, gender, event, row["Swimmer"])] = int(row["Rank"])
+    return city_ranks
 
-                # val = ""
+def buildPdf(outputPath, participants, times_pivot, city_ranks, results, immeet, oppTeam, timeAllData, champs = False):
+    # -------------------------------
+    # Build PDF
+    # -------------------------------
+    doc = SimpleDocTemplate(outputPath, leftMargin = 0, rightMargin = 0)
+    styles = getSampleStyleSheet()
+    styles["Heading2"].alignment = TA_CENTER
+    elements = []
 
-                # if (
-                #     not cur_row.empty
-                #     and flag_col in cur_row.columns
-                # ):
-                #     val = cur_row.iloc[0][flag_col]
+    age_groups = ["5-6", "7-8", "9-10", "11-12", "13-14", "15-18"]
 
-                #     # Clean missing values
-                #     if pd.isna(val) or val <= 0:
-                #         val = ""
+    page_width = doc.width
 
-                if name in times_pivot.index and event in times_pivot.columns:
-                    val = times_pivot.loc[name, event]
+    for age in age_groups:
+        for gender in ["W", "M"]:
+            group = participants[(participants["AgeGroup"] == age) & (participants["Gender"] == gender)]
 
-                    if pd.isna(val) or val == "":
-                        val = ""
+            if group.empty:
+                continue
 
-                row_data.append(format_val(val))
+            events = get_events(age, immeet, champs = champs)
 
-                flag_col = get_event_flag(event,age)
+            # Table header
+            data = [["Name"] + events]
 
-                if (
-                    flag_col
-                    and not swimmer_flags.empty
-                    and flag_col in swimmer_flags.columns
-                    and swimmer_flags.iloc[0][flag_col] == 1
-                ):
-                    cell_styles.append(('BACKGROUND', (col_idx, row_idx), (col_idx, row_idx), colors.lightgrey))
-                
-            data.append(row_data)
+            cell_styles = []
 
-        # Create table
-        num_cols = len(data[0])
+            for row_idx, (_, swimmer_row) in enumerate(group.iterrows(), start = 1):
+                name = swimmer_row["Name"]
 
-        name_col_width = page_width * 0.25
+                swimmer_flags = results[results['Swimmer'] == name.lower()]
 
-        other_width = max(50, (page_width - name_col_width) / (num_cols - 1))
-        col_widths = [name_col_width] + [other_width] * (num_cols - 1)
+                table_row = [name]
 
-        table = Table(data, colWidths=col_widths)
-        table.hAlign = 'LEFT'
+                for col_idx, event in enumerate(events, start = 1):
+                    val = ""
 
-        table.setStyle(TableStyle([
-            ("GRID", (0,0), (-1,-1), 0.5, colors.black),
-            ("BACKGROUND", (0,0), (-1,0), colors.lightgrey)
-        ] + cell_styles))
+                    if name in times_pivot.index and event in times_pivot.columns:
+                        val = times_pivot.loc[name, event]
 
-        title_text = f"{'Boys' if gender == 'M' else "Girls"} {age}"
-        elements.append(Paragraph(title_text, styles['Heading2']))
-        elements.append(table)
+                        if pd.isna(val) or val == "":
+                            val = ""
 
-        oppTimes = ind.oppTimes(timeAllData, age_group_to_range(age), gender, oppTeam)
-        oppTimes = oppTimes.apply(pd.to_numeric, errors = 'coerce')
-        oppTimes = oppTimes.apply(lambda col: col.sort_values(ignore_index = True))
-        print(oppTimes)
-        for index, row in oppTimes.iterrows():
+                    rank = city_ranks.get(
+                        (age, gender, event, name),
+                        None
+                    )
+                    
+                    table_row.append(format_time_with_rank(format_val(val), rank, styles))
 
-            if age == '5-6' or age == '7-8':
-                extra_times = ["", format_val(row['sf']), format_val(row['ba']), format_val(row['br']), format_val(row['fl']), format_val(row['lf'])]
-            else:
-                extra_times = ["", format_val(row['sf']), format_val(row['ba']), format_val(row['br']), format_val(row['fl']), format_val(row['lf']), format_val(row['im'])]
+                    flag_col = get_event_flag(event,age)
 
-            times_row = Table([extra_times], colWidths=col_widths)
-            times_row.hAlign = 'LEFT'
+                    if (
+                        flag_col
+                        and not swimmer_flags.empty
+                        and flag_col in swimmer_flags.columns
+                        and swimmer_flags.iloc[0][flag_col] == 1
+                    ):
+                        cell_styles.append(('BACKGROUND', (col_idx, row_idx), (col_idx, row_idx), colors.lightgrey))
+                    
+                data.append(table_row)
 
-            times_row.setStyle(TableStyle([
-                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
-                ("TOPPADDING", (0, 0), (-1, -1), 6),
-                ("FONTSIZE", (0,0), (-1,-1), 12),
-            ]))
+            # Create table
+            num_cols = len(data[0])
 
-            elements.append(times_row)
+            name_col_width = page_width * 0.25
 
-        elements.append(PageBreak())
+            other_width = max(50, (page_width - name_col_width) / (num_cols - 1))
+            col_widths = [name_col_width] + [other_width] * (num_cols - 1)
 
-# Build PDF
-doc.build(elements)
+            table = Table(data, colWidths=col_widths)
+            table.hAlign = 'LEFT'
 
-print("PDF created: meet_plan.pdf")
+            table.setStyle(TableStyle([
+                ("GRID", (0,0), (-1,-1), 0.5, colors.black),
+                ("BACKGROUND", (0,0), (-1,0), colors.lightgrey)
+            ] + cell_styles))
+
+            title_text = f"{'Boys' if gender == 'M' else "Girls"} {age}"
+            elements.append(Paragraph(title_text, styles['Heading2']))
+            elements.append(table)
+            if not champs:
+                oppTimes = ind.oppTimes(timeAllData, age_group_to_range(age), gender, oppTeam)
+                oppTimes = oppTimes.apply(pd.to_numeric, errors = 'coerce')
+                oppTimes = oppTimes.apply(lambda col: col.sort_values(ignore_index = True))
+                print(oppTimes)
+                for index, row in oppTimes.iterrows():
+
+                    if age == '5-6' or age == '7-8':
+                        extra_times = ["", format_val(row['sf']), format_val(row['ba']), format_val(row['br']), format_val(row['fl']), format_val(row['lf'])]
+                    else:
+                        extra_times = ["", format_val(row['sf']), format_val(row['ba']), format_val(row['br']), format_val(row['fl']), format_val(row['lf']), format_val(row['im'])]
+
+                    times_row = Table([extra_times], colWidths=col_widths)
+                    times_row.hAlign = 'LEFT'
+
+                    times_row.setStyle(TableStyle([
+                        ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                        ("TOPPADDING", (0, 0), (-1, -1), 6),
+                        ("FONTSIZE", (0,0), (-1,-1), 12),
+                    ]))
+
+                    elements.append(times_row)
+            if champs:
+                pass
+
+            elements.append(PageBreak())
+
+    # Build PDF
+    doc.build(elements)
+
+    print("PDF created: meet_plan.pdf")

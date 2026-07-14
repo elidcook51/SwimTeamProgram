@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 import swimmerRegression
+import math
+from collections import defaultdict
 
 teams = ['ACAC', 'BHSC', 'CITY', 'CGST', 'CBST', 'FV', 'FCC','FAST', 'FSBC', 'GLEN', 'GHG', 'HM', 'KWC', 'FLST', 'LMST', 'LG']
 ages = [6, 8, 10, 12, 14, 18]
@@ -39,6 +41,9 @@ def getGenders():
 def getStrokes():
     return strokes
 
+def getUnder8Strokes():
+    return ['sf', 'ba', 'br', 'fl', 'lf']
+
 def getAgeGenderTeam(df, ageRange, gender, team):
     df = df[df['Age'].isin(ageRange)]
     df = df[df['Gender'] == gender]
@@ -52,17 +57,29 @@ def toSCM(team, time):
         return time * 0.911
     else:
         return time
+    
+def combine_team_scores(team_score, agscores):
+    combined = defaultdict(int)
+
+    for d in (team_score, agscores):
+        for team, score in d.items():
+            combined[team] += score
+
+    return combined
+    
+def checkNan(time):
+    return time if isinstance(time, float) and not math.isnan(time) else -1
 
 class Swimmer:
 
     def __init__(self, name, team, age, gender, times):
         self.name = name
-        self.sf = times[0]
-        self.ba = times[1]
-        self.br = times[2]
-        self.fl = times[3]
-        self.lf = times[4]
-        self.im = times[5]
+        self.sf = checkNan(times[0])
+        self.ba = checkNan(times[1])
+        self.br = checkNan(times[2])
+        self.fl = checkNan(times[3])
+        self.lf = checkNan(times[4])
+        self.im = checkNan(times[5])
         self.team = team
         self.age = age
         self.gender = gender
@@ -96,6 +113,8 @@ class Swimmer:
             self.enterStroke(s)
 
     def removeStroke(self, stroke):
+        if stroke not in ['sf', 'ba', 'br', 'fl', 'lf', 'im']:
+            return
         self.entered[getIndexOfStroke(stroke)] = False
 
     def getAge(self):
@@ -138,6 +157,9 @@ class Swimmer:
             'lf': enteredTimes[4],
             'im': enteredTimes[5],
         }
+    
+    def __str__(self):
+        return str(self.getDictEntries())
 
 
 class AgeGroup:

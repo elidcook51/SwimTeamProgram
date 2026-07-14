@@ -1,4 +1,3 @@
-import seedingHelp as help
 from pypdf import PdfReader
 import pandas as pd
 import os
@@ -6,7 +5,6 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 import cloudscraper
-import fitz
 import pytesseract
 from pdf2image import convert_from_path
 import re
@@ -41,6 +39,14 @@ swimTopiaEventMap = {
 } | {
     e: 'im'           for e in range(4, 12)
 }
+
+def toSCM(team, time):
+    if team in ['BHSC', 'KWC', 'LG']:
+        return time * 1.111
+    if team in ['ACAC', 'FSBC']:
+        return time * 0.971
+    else:
+        return time
 
 def convertTimes(list, sort):
     if sort:
@@ -403,7 +409,7 @@ def saveSpecificUrl(url, outputFolder):
         print('retry program, big oopsie')
 
 def pullSwimTopiaResults(url, outputFolder):
-    if outputFolder.is_dir():
+    if os.path.isdir(outputFolder):
         shutil.rmtree(outputFolder)
 
     scraper = cloudscraper.create_scraper()
@@ -491,7 +497,7 @@ def parseSwimTopiaText(text):
             r'(\d{1,2})\s+'
 
             # --- TEAM ---
-            r'([A-Z]{3,5})\s+'
+            r'([A-Z]{2,5})\s+'
 
             # Optional NT / seed time(s)
             r'(?:NT\s+)?'
@@ -507,8 +513,11 @@ def parseSwimTopiaText(text):
         for m in pattern.finditer(chunk):
             last, first, age, team, time_str = m.groups()
 
-            last = last.strip()
-            first = first.strip()
+            last = re.sub(r'^[^A-Za-z]+', '', last).strip()
+            first = re.sub(r'^[^A-Za-z]+', '', first).strip()
+
+            last = last.lower()
+            first = first.lower()
 
             # Convert time
             if ':' in time_str:
@@ -586,9 +595,7 @@ def readSwimTopiaResults(folderPath):
             f.write(text)
 
         meetDf = parseSwimTopiaText(text)
-        meetDf['Time'] = meetDf['Time'].apply(lambda t: help.toSCM(home, t))
-
-        #FIX TO GET YARDS TIMES CORRECT!
+        meetDf['Time'] = meetDf['Time'].apply(lambda t: toSCM(home, t))
 
         fullData = pd.concat([fullData, meetDf], ignore_index = True)
 
@@ -634,15 +641,15 @@ def transformSwimTopiaResults(df):
     return result
 
 # swimtopiaResults = 'https://jsl.swimtopia.com/full-results'
-swimTopiaResultsFolder = "C:/Users/ucg8nb/Downloads/2026 Results"
+# swimTopiaResultsFolder = "C:/Users/ucg8nb/Downloads/2026 Results"
 # pullSwimTopiaResults(swimtopiaResults, swimTopiaResultsFolder)
 
-df = readSwimTopiaResults(swimTopiaResultsFolder)
-df.to_csv("C:/Users/ucg8nb/Downloads/Untransformed 2026.csv")
+# df = readSwimTopiaResults(swimTopiaResultsFolder)
+# df.to_csv("C:/Users/ucg8nb/Downloads/Untransformed 2026.csv")
 
-df = pd.read_csv("C:/Users/ucg8nb/Downloads/Untransformed 2026.csv")
-transformeddf = transformSwimTopiaResults(df)
-transformeddf.to_csv("C:/Users/ucg8nb/Downloads/Transformed 2026.csv")
+# df = pd.read_csv("C:/Users/ucg8nb/Downloads/Untransformed 2026.csv")
+# transformeddf = transformSwimTopiaResults(df)
+# transformeddf.to_csv("C:/Users/ucg8nb/Downloads/Transformed 2026.csv")
 
 # jslPath = "C:/Users/ucg8nb/JSL All Results 2021-2025"
 # fullData = getFullData(jslPath)

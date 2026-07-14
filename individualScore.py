@@ -4,7 +4,7 @@ import os
 from itertools import combinations
 import seedingHelp as help
 import swimmerRegression
-from collections import Counter
+from collections import Counter, defaultdict
 
 def findIndexInList(list, num):
     for i in range(len(list)):
@@ -70,8 +70,24 @@ def seedOtherTeams(allData, ageRange, gender):
                         output = output._append(rowTwo, ignore_index = True)
     return output
 
+def getScoresDictFromTopTwo(topTwo):
+    team_scores = defaultdict(int)
+    for stroke in topTwo['Stroke'].unique():
+        stroke_df = topTwo[topTwo['Stroke'] == stroke].copy()
+
+        stroke_df = stroke_df.sort_values('Time')
+
+        stroke_df['place'] = range(1, len(stroke_df) + 1)
+
+        for _, row in stroke_df.iterrows():
+            score = placeToScore(row['place'])
+            team_scores[row['Team']] += score
+    return team_scores
+
 def scoreOneTeam(allData, ageRange, gender, team):
     topTwo = seedOtherTeams(allData, ageRange, gender)
+    team_score = getScoresDictFromTopTwo(topTwo)
+    del team_score['CITY']
     topTwo = topTwo[topTwo['Team'] != team]
     teamData = allData[allData['Team'] == team]
     teamData = teamData[teamData['Age'].isin(ageRange)]
@@ -104,7 +120,7 @@ def scoreOneTeam(allData, ageRange, gender, team):
             'im': strokes[5]
         }
         outputTeamData = outputTeamData._append(newRow, ignore_index = True)
-    return outputTeamData
+    return outputTeamData, team_score
 
 def scoreOneTeamDuel(allData, ageRange, gender, team1, team2):
     topTwo = seedOtherTeams(allData, ageRange, gender)

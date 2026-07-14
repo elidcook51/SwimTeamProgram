@@ -6,6 +6,11 @@ import databaseBuilder as db
 import fillingEvents as fill
 import pandas as pd
 import numpy as np
+import meetplanningsheet as sheet
+from copy import deepcopy
+from collections import defaultdict
+import swimmerRegression
+import re
 
 allData = pd.read_csv("C:/Users/ucg8nb/JSL All Results 2021-2025\Transformed Data.csv")
 
@@ -61,22 +66,70 @@ def resultsToString(x_vals, y_vals, incData, allData):
         
     return outputString
 
+def print_team_scores(team_scores):
+    outputString = ""
+    count = 1
+    for team, points in sorted(team_scores.items(), key = lambda x: x[1], reverse = True):
+        outputString += f"{count}. {team} - {points} \n"
+        count += 1
+    return outputString
+
+def enteredStringToDf(enteredString):
+    rows = []
+    for line in enteredString.splitlines():
+        if not line.startswith("Swimmer:"):
+            continue
+
+        m = re.match(r"Swimmer:\s*(.*?)\s*entered in\s*(.*)", line)
+        if not m:
+            continue
+
+        name = m.group(1).strip().lower()
+        events = m.group(2)
+
+        rows.append({
+            "Swimmer": name,
+            "in_ba": "ba," in events,
+            "in_br": "br," in events,
+            "in_fl": "fl," in events,
+            "in_fr": "fr," in events,
+            "in_im": "im," in events,
+            "in_lf": "lf," in events,
+            "in_sf": "sf," in events,
+            "mr_ba": "mr (ba)" in events,
+            "mr_br": "mr (br)" in events,
+            "mr_fl": "mr (fl)" in events,
+            "mr_fr": "mr (fr)" in events,
+        })
+
+    strokes_df = pd.DataFrame(rows)
+
+    bool_cols = strokes_df.select_dtypes(include = 'bool').columns
+    strokes_df[bool_cols] = strokes_df[bool_cols].astype(int)
+
+    return strokes_df
+
 def seedChamps(allData, team):
     ageRanges = help.getAgeGroups()
     genders = help.getGenders()
     outputString = ''
     totPoints = 0
+    team_scores = defaultdict(int)
     for a in ageRanges:
         for g in genders:
-            tempDf = ind.scoreOneTeam(allData, a, g, team)
+            print(f'Seeding ages {a} for gender {g}')
+            tempDf, agscores = ind.scoreOneTeam(allData, a, g, team)
+            team_scores = help.combine_team_scores(team_scores, agscores)
             tempDf = ind.dataframePlaceToScoreChamps(tempDf)
-            relayPos = relay.buildRelayPositions(allData, a, g, team, algorithms.getThreeEventSwimmers(tempDf))
+            relayPos, agrelayscores = relay.buildRelayPositions(allData, a, g, team, algorithms.getThreeEventSwimmers(tempDf))
+            team_scores = help.combine_team_scores(team_scores, agrelayscores)
             swimmers = tempDf['Swimmer'].tolist()
             incData = relay.buildInc(relayPos, swimmers)
             x_vals, y_vals, points = algorithms.relayProgram(tempDf, relayPos, incData)
             totPoints += points
             outputString += resultsToString(x_vals,y_vals, incData, allData)
-    return outputString + f'\n Total Points Scored: {totPoints}'
+    team_scores['CITY'] = totPoints
+    return outputString + f'\n Total Points Scored: {totPoints} \n Final Results: \n {print_team_scores(team_scores)}'
 
 def seedDuelMeet(allData, team1, team2, year):
     allData['Age'] = allData['Age'] + year - 2026
@@ -97,4 +150,51 @@ def seedDuelMeet(allData, team1, team2, year):
     df = pd.merge(df, allData, on = 'Swimmer', how  = 'inner')
     df = fill.fillEvents(df, max_events = 2, max_event_size = 12)
     return df
+
+def createDuelMeetPlanningSheet(oppTeam, immeet, participantsPath, bestTimesPath = "C:/Users/ucg8nb/Downloads/best_times.csv", allDataPath = "C:/Users/ucg8nb/Downloads/Transformed 2026.csv", rosterPath = "C:/Users/ucg8nb/Downloads/cityswordfishteam_athlete_roster_260702111202.csv"):
+    participants = pd.read_csv(participantsPath)
+    times = pd.read_csv(bestTimesPath)
+    rosterdf = pd.read_csv(rosterPath)
+    allData = pd.read_csv(allDataPath)
+    timeAllData = deepcopy(allData)
+    participants, times_pivot = sheet.normalizeNameKeys(participants, times, rosterdf)
+    allData, cityData = sheet.cleanAllData(allData, participants)
+    allData = swimmerRegression.standardizeAllData(allData)
+    results = seedDuelMeet(allData, 'CITY', oppTeam, 2026)
+    city_ranks = sheet.getCityRanks(cityData)
+    sheet.buildPdf("C:/Users/ucg8nb/Downloads/meet_plan.pdf", participants, times_pivot, city_ranks, results, immeet, oppTeam, timeAllData)
+
+def createChampsMeetPlanningSheet(participantsPath, bestTimesPath = "C:/Users/ucg8nb/Downloads/best_times.csv", allDataPath = "C:/Users/ucg8nb/Downloads/Transformed 2026.csv", rosterPath = "C:/Users/ucg8nb/Downloads/cityswordfishteam_athlete_roster_260702111202.csv"):
+    participants = pd.read_csv(participantsPath)
+    times = pd.read_csv(bestTimesPath)
+    rosterdf = pd.read_csv(rosterPath)
+    allData = pd.read_csv(allDataPath)
+    timeAllData = deepcopy(allData)
+    participants, times_pivot = sheet.normalizeNameKeys(participants, times, rosterdf)
+    allData, cityData = sheet.cleanAllData(allData, participants)
+    allData = swimmerRegression.standardizeAllData(allData)
+    cityData = swimmerRegression.standardizeAllData(cityData)
+    resultsString = seedChamps(allData, 'CITY')
+    print(resultsString)
+    entered_df = enteredStringToDf(resultsString)
+    entered_df = pd.merge(allData[['Swimmer', 'Age', 'Gender']], entered_df, on = 'Swimmer', how = 'inner')
+    cityData['Swimmer'] = cityData['Swimmer'].str.lower()
+    entered_df = pd.merge(cityData[['Swimmer', 'sf', 'ba', 'br', 'fl', 'lf', 'im']], entered_df, on = 'Swimmer', how = 'left')
+    entered_df[['in_ba','in_br', 'in_fl', 'in_fr', 'in_im', 'in_lf', 'in_sf', 'mr_ba', 'mr_br','mr_fl', 'mr_fr']] = entered_df[['in_ba','in_br', 'in_fl', 'in_fr', 'in_im', 'in_lf', 'in_sf', 'mr_ba', 'mr_br','mr_fl', 'mr_fr']].fillna(0).astype(int)
+    city_ranks = sheet.getCityRanks(cityData)
+    # entered_df = fill.fillEventsChamps(entered_df)
+    sheet.buildPdf("C:/Users/ucg8nb/Downloads/Champs Meet Sheet.pdf", participants, times_pivot, city_ranks, entered_df, False, '', timeAllData, champs = True)
+    
+
+
+participantSheetPath = "C:/Users/ucg8nb/Downloads/cityswordfishteam_meet_participants_260710103239.csv"
+bestTimesPath = "C:/Users/ucg8nb/Downloads/best_times.csv"
+allDataPath = "C:/Users/ucg8nb/Downloads/Transformed 2026.csv"
+rosterPath = "C:/Users/ucg8nb/Downloads/cityswordfishteam_athlete_roster_260702111202.csv"
+
+# createDuelMeetPlanningSheet('ACAC', False, participantsPath = participantSheetPath)
+allData = pd.read_csv(allDataPath)
+createChampsMeetPlanningSheet(participantsPath=participantSheetPath)
+# print(seedChamps(allData, 'CITY'))
+
 
