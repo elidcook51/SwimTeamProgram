@@ -241,6 +241,30 @@ def getCityRanks(cityData):
                     city_ranks[(age, gender, event, row["Swimmer"])] = int(row["Rank"])
     return city_ranks
 
+def getRelayString(results, age, gender):
+    age = age_group_to_range(age)
+    df = results[results['Age'].isin(age)].copy()
+    df = df[df['Gender'] == gender]
+    try:
+        fr_swimmers = (df.loc[df['in_fr'] == 1, ['Swimmer', 'sf']].sort_values('sf', ascending = False))
+
+        fr_text = "\n".join(f"{i}) {name}" for i, name in enumerate(fr_swimmers['Swimmer'], start = 1))
+
+        fr = f"Free Relay: \n {fr_text}"
+    except Exception:
+        fr = ""
+
+    try:
+        ba = df.loc[df['mr_ba'] == 1, 'Swimmer'].iat[0]
+        br = df.loc[df['mr_br'] == 1, 'Swimmer'].iat[0]
+        fl = df.loc[df['mr_fl'] == 1, 'Swimmer'].iat[0]
+        sf = df.loc[df['mr_fr'] == 1, 'Swimmer'].iat[0]
+        mr = f"Medley Relay: \n Ba: {ba} \n Br: {br} \n Fly: {fl} \n Fr: {sf}"
+    except Exception:
+        mr = "SWIM UP!!"
+
+    return fr, mr
+
 def buildPdf(outputPath, participants, times_pivot, city_ranks, results, immeet, oppTeam, timeAllData, champs = False):
     # -------------------------------
     # Build PDF
@@ -345,7 +369,19 @@ def buildPdf(outputPath, participants, times_pivot, city_ranks, results, immeet,
 
                     elements.append(times_row)
             if champs:
-                pass
+                free_relay, medley_relay = getRelayString(results, age, gender)
+
+                left_para = Paragraph(free_relay.replace("\n", "<br/>"), styles["BodyText"])
+                right_para = Paragraph(medley_relay.replace("\n", "<br/>"), styles["BodyText"])
+
+                foot_table = Table([[left_para, right_para]], colWidths=[page_width/2, page_width/ 2])
+
+                foot_table.setStyle(TableStyle([
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+                ]))
+                elements.append(foot_table)
 
             elements.append(PageBreak())
 
