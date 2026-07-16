@@ -53,33 +53,97 @@ def assign(df, max_events = 3, max_event_size = 12):
     
     return df
 
+# def fillTo4(bigDf):
+#     outputDf = pd.DataFrame()
+#     for ageRange in help.getAgeGroups():
+#         for gender in help.getGenders():
+#             df = bigDf[bigDf['Age'].isin(ageRange)]
+#             df = df[df['Gender'] == gender]
+#             if 8 in ageRange:
+#                 strokes = help.getUnder8Strokes()
+#             else:
+#                 strokes = help.getStrokes()
+
+#             for stroke in strokes:
+#                 in_col = f"in_{stroke}"
+
+#                 while df[in_col].sum() < 4:
+#                     candidates = df[df[in_col] == 0].copy()
+
+#                     if candidates.empty:
+#                         break
+
+#                     idx = candidates[stroke].idxmin()
+#                     df.loc[idx, in_col] = 1
+
+#             changed = True
+#             while changed:
+#                 changed = False
+
+#                 event_counts = df[[f"in_{s}" for s in strokes]].sum(axis = 1)
+
+#                 for swimmer_idx  in df.index[event_counts > 3]:
+#                     entered = [
+#                         s for s in strokes
+#                         if df.loc[swimmer_idx, f"in_{s}"] == 1
+#                     ]
+
+#                     removable = []
+
+#                     for s in entered:
+#                         entrants = df[df[f"in_{s}"] == 1]
+#                         rank = entrants[s].rank(method = 'first').loc[swimmer_idx]
+
+#                         if rank >= 3:
+#                             removable.append(s)
+                    
+#                     if not removable:
+#                         continue
+
+#                     slowest = max(removable, key = lambda s: df.loc[swimmer_idx, s])
+
+#                     df.loc[swimmer_idx, f"in_{slowest}"] = 0 
+#                     changed = True
+#             outputDf = pd.concat([outputDf, df])
+#     return outputDf
+
 def fillTo4(bigDf):
+    inevents = ['in_im', 'in_lf', 'in_sf', 'in_ba', 'in_br', 'in_fl', 'in_fr', 'mr_fr', 'mr_ba', 'mr_br', 'mr_fl']
+    individuals = ['in_im', 'in_lf', 'in_sf', 'in_ba', 'in_br', 'in_fl']
     outputDf = pd.DataFrame()
     for ageRange in help.getAgeGroups():
         for gender in help.getGenders():
-            df = bigDf[bigDf['Age'].isin(ageRange)]
+            df = bigDf[bigDf['Age'].isin(ageRange)].copy()
             df = df[df['Gender'] == gender]
             if 8 in ageRange:
                 strokes = help.getUnder8Strokes()
             else:
                 strokes = help.getStrokes()
 
-            for stroke in strokes:
-                in_col = f"in_{stroke}"
+            candidates = {}
+            strokePos = {}
+            for s in strokes:
 
-                while df[in_col].sum() < 4:
-                    candidates = df[df[in_col] == 0].copy()
+                candidates[s] = df.loc[df[s] != -1].sort_values(s)['Swimmer'].tolist()
 
-                    if candidates.empty:
-                        break
+                entered = (
+                    df.loc[(df[f"in_{s}"] == 1) & (df[s] != -1)].sort_values(s)
+                )
 
-                    idx = candidates[stroke].idxmin()
-                    df.loc[idx, in_col] = 1
+                slowest_entered_name = entered.iloc[-1]['Swimmer']
+
+                strokePos[s] = candidates[s].index(slowest_entered_name)
+
+                while len(candidates[s]) > strokePos[s] + 1 and df[f"in_{s}"].sum() < 4:
+                    strokePos[s] += 1
+                    newSwimmer = candidates[s][strokePos[s]]
+
+                    df.loc[df['Swimmer'] == newSwimmer, f"in_{s}"] = 1
 
             changed = True
             while changed:
                 changed = False
-
+                
                 event_counts = df[[f"in_{s}" for s in strokes]].sum(axis = 1)
 
                 for swimmer_idx  in df.index[event_counts > 3]:
@@ -93,19 +157,29 @@ def fillTo4(bigDf):
                     for s in entered:
                         entrants = df[df[f"in_{s}"] == 1]
                         rank = entrants[s].rank(method = 'first').loc[swimmer_idx]
-
                         if rank >= 3:
                             removable.append(s)
-                    
-                    if not removable:
-                        continue
 
                     slowest = max(removable, key = lambda s: df.loc[swimmer_idx, s])
 
                     df.loc[swimmer_idx, f"in_{slowest}"] = 0 
                     changed = True
+                    strokePos[slowest] += 1
+                    if len(candidates[slowest]) > strokePos[slowest] + 1:
+                        df.loc[df['Swimmer'] == candidates[slowest][strokePos[slowest]], f"in_{slowest}"] = 1
+            for s in strokes:
+                changed = True
+                if df[f"in_{s}"].sum() < 4:
+                    changed = False
+                    for candidate in candidates[s]:
+                        if changed:
+                            continue
+                        if df.loc[df["Swimmer"] == candidate, inevents].sum(axis=1).iloc[0] < 4 and df.loc[df["Swimmer"] == candidate, individuals].sum(axis=1).iloc[0] < 3:
+                            df.loc[df['Swimmer'] == candidate, f"in_{s}"] = 1
+                            changed = True
             outputDf = pd.concat([outputDf, df])
     return outputDf
+
 
 def fillEventsChamps(bigDf):
     individuals = ['in_im', 'in_lf', 'in_sf', 'in_ba', 'in_br', 'in_fl']
@@ -121,5 +195,12 @@ def fillEventsChamps(bigDf):
             numInd += 1
             if numInd >= 2:
                 continue
+        curBest = ""
+        curTime = 1
+        for s in ['ba', 'br', 'fl']:
+            if bigDf.loc[index, s] != -1 and bigDf.loc[index, s] < curTime:
+                curBest = s
+                curTime = bigDf.loc[index, s]
+        if curBest != "":
+            bigDf.loc[index, f"in_{curBest}"] = 1
     return bigDf
-        
